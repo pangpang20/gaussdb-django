@@ -7,8 +7,8 @@
 import os
 
 hosts = os.getenv("GAUSSDB_HOST", "127.0.0.1")
-port = os.getenv("GAUSSDB_PORT", 5432)
-user = os.getenv("GAUSSDB_USER", "postgres")
+port = os.getenv("GAUSSDB_PORT", 8888)
+user = os.getenv("GAUSSDB_USER", "root")
 password = os.getenv("GAUSSDB_PASSWORD", "Audaque@123")
 
 DATABASES = {
@@ -31,7 +31,7 @@ DATABASES = {
         "OPTIONS": {},
     },
 }
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 USE_TZ = False
 SECRET_KEY = "django_tests_secret_key"
 
@@ -39,3 +39,10 @@ SECRET_KEY = "django_tests_secret_key"
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": "/tmp/gaussdb_cache",
+    }
+}

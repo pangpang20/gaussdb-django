@@ -19,6 +19,8 @@ from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.safestring import SafeString
 from django.utils.version import get_version_tuple
+from django.db.backends.postgresql.base import ServerBindingCursor, CursorDebugWrapper
+
 
 try:
     try:
@@ -570,8 +572,8 @@ if is_psycopg3:
             self.execute(stmt)
             return args
 
-    class ServerBindingCursor(CursorMixin, Database.Cursor):
-        pass
+    # class ServerBindingCursor(CursorMixin, PGServerBindingCursor):
+    #     pass
 
     class Cursor(CursorMixin, Database.ClientCursor):
         pass
