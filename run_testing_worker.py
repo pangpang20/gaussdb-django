@@ -5,6 +5,9 @@
 # See LICENSE file in the project root for full license information.
 
 import os
+import time
+
+start_time = time.time()
 
 with open("django_test_apps.txt", "r") as file:
     all_apps = file.read().split("\n")
@@ -21,4 +24,10 @@ exitcode = os.WEXITSTATUS(
         )
     )
 )
+
+end_time = time.time()
+elapsed_time = end_time - start_time
+
+print(f"\nTotal elapsed time: {elapsed_time:.2f} seconds")
+
 exit(exitcode)
