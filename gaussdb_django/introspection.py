@@ -94,7 +94,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
                 CASE WHEN collname = 'default' THEN NULL ELSE collname END AS collation,
                 CASE 
-                    WHEN pg_get_expr(ad.adbin, ad.adrelid) LIKE 'nextval(%'
+                    WHEN pg_get_expr(ad.adbin, ad.adrelid) LIKE 'nextval(%%'
                     THEN true
                     ELSE false
                 END AS is_autofield,
