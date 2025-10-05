@@ -1,3 +1,4 @@
+import re
 from collections import namedtuple
 
 from django.db.backends.base.introspection import BaseDatabaseIntrospection
@@ -60,14 +61,13 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             SELECT
                 c.relname,
                 CASE
-                    WHEN c.relispartition THEN 'p'
                     WHEN c.relkind IN ('m', 'v') THEN 'v'
                     ELSE 't'
                 END,
                 obj_description(c.oid, 'pg_class')
             FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN ('f', 'm', 'p', 'r', 'v')
+            WHERE c.relkind IN ('f', 'm', 'r', 'v')
                 AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
                 AND pg_catalog.pg_table_is_visible(c.oid)
         """
@@ -93,7 +93,11 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
                 pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
                 CASE WHEN collname = 'default' THEN NULL ELSE collname END AS collation,
-                a.attidentity != '' AS is_autofield,
+                CASE 
+                    WHEN pg_get_expr(ad.adbin, ad.adrelid) LIKE 'nextval(%'
+                    THEN true
+                    ELSE false
+                END AS is_autofield,
                 col_description(a.attrelid, a.attnum) AS column_comment
             FROM pg_attribute a
             LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
@@ -101,7 +105,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             JOIN pg_type t ON a.atttypid = t.oid
             JOIN pg_class c ON a.attrelid = c.oid
             JOIN pg_namespace n ON c.relnamespace = n.oid
-            WHERE c.relkind IN ('f', 'm', 'p', 'r', 'v')
+            WHERE c.relkind IN ('f', 'm', 'r', 'v')
                 AND c.relname = %s
                 AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
                 AND pg_catalog.pg_table_is_visible(c.oid)
@@ -116,7 +120,6 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             FieldInfo(
                 line.name,
                 line.type_code,
-                # display_size is always None on psycopg2.
                 line.internal_size if line.display_size is None else line.display_size,
                 line.internal_size,
                 line.precision,
@@ -177,6 +180,30 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         return {row[0]: (row[2], row[1]) for row in cursor.fetchall()}
 
+    def parse_indexdef(defn: str):
+        """
+        从 pg_get_indexdef() 解析列名和排序 (ASC/DESC)。
+        """
+        if not defn:
+            return [], []
+        m = re.search(r"\((.*)\)", defn)
+        if not m:
+            return [], []
+        content = m.group(1)
+        parts = [p.strip() for p in content.split(",")]
+        columns, orders = [], []
+        for p in parts:
+            if p.lower().endswith(" desc"):
+                columns.append(p[:-5].strip())
+                orders.append("DESC")
+            elif p.lower().endswith(" asc"):
+                columns.append(p[:-4].strip())
+                orders.append("ASC")
+            else:
+                columns.append(p)
+                orders.append(None)
+        return columns, orders
+
     def get_constraints(self, cursor, table_name):
         """
         Retrieve any constraints or keys (unique, pk, fk, check, index) across
@@ -192,11 +219,12 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             SELECT
                 c.conname,
                 array(
-                    SELECT attname
-                    FROM unnest(c.conkey) WITH ORDINALITY cols(colid, arridx)
-                    JOIN pg_attribute AS ca ON cols.colid = ca.attnum
+                    SELECT ca.attname
+                    FROM generate_series(1, array_length(c.conkey, 1)) AS arridx
+                    JOIN pg_attribute AS ca
+                        ON ca.attnum = c.conkey[arridx]
                     WHERE ca.attrelid = c.conrelid
-                    ORDER BY cols.arridx
+                    ORDER BY arridx
                 ),
                 c.contype,
                 (SELECT fkc.relname || '.' || fka.attname
@@ -225,75 +253,40 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         cursor.execute(
             """
             SELECT
-                indexname,
-                array_agg(attname ORDER BY arridx),
-                indisunique,
-                indisprimary,
-                array_agg(ordering ORDER BY arridx),
-                amname,
-                exprdef,
-                s2.attoptions
-            FROM (
-                SELECT
-                    c2.relname as indexname, idx.*, attr.attname, am.amname,
-                    CASE
-                        WHEN idx.indexprs IS NOT NULL THEN
-                            pg_get_indexdef(idx.indexrelid)
-                    END AS exprdef,
-                    CASE am.amname
-                        WHEN %s THEN
-                            CASE (option & 1)
-                                WHEN 1 THEN 'DESC' ELSE 'ASC'
-                            END
-                    END as ordering,
-                    c2.reloptions as attoptions
-                FROM (
-                    SELECT *
-                    FROM
-                        pg_index i,
-                        unnest(i.indkey, i.indoption)
-                            WITH ORDINALITY koi(key, option, arridx)
-                ) idx
-                LEFT JOIN pg_class c ON idx.indrelid = c.oid
-                LEFT JOIN pg_class c2 ON idx.indexrelid = c2.oid
-                LEFT JOIN pg_am am ON c2.relam = am.oid
-                LEFT JOIN
-                    pg_attribute attr ON attr.attrelid = c.oid AND attr.attnum = idx.key
-                WHERE c.relname = %s AND pg_catalog.pg_table_is_visible(c.oid)
-            ) s2
-            GROUP BY indexname, indisunique, indisprimary, amname, exprdef, attoptions;
-        """,
-            [self.index_default_access_method, table_name],
+                c2.relname as indexname,
+                i.indisunique,
+                i.indisprimary,
+                pg_get_indexdef(i.indexrelid) as definition,
+                c2.reloptions,
+                am.amname
+            FROM pg_index i
+            LEFT JOIN pg_class c ON i.indrelid = c.oid
+            LEFT JOIN pg_class c2 ON i.indexrelid = c2.oid
+            LEFT JOIN pg_am am ON c2.relam = am.oid
+            WHERE c.relname = %s
+            AND pg_catalog.pg_table_is_visible(c.oid)
+            """,
+            [table_name],
         )
-        for (
-            index,
-            columns,
-            unique,
-            primary,
-            orders,
-            type_,
-            definition,
-            options,
-        ) in cursor.fetchall():
+        for index, unique, primary, definition, options, amname in cursor.fetchall():
             if index not in constraints:
+                columns, orders = parse_indexdef(definition)
                 basic_index = (
-                    type_ == self.index_default_access_method
-                    and
-                    # '_btree' references
-                    # django.contrib.postgres.indexes.BTreeIndex.suffix.
-                    not index.endswith("_btree")
+                    amname == self.index_default_access_method
+                    and not index.endswith("_btree")
                     and options is None
                 )
                 constraints[index] = {
-                    "columns": columns if columns != [None] else [],
-                    "orders": orders if orders != [None] else [],
+                    "columns": columns,
+                    "orders": orders,
                     "primary_key": primary,
                     "unique": unique,
                     "foreign_key": None,
                     "check": False,
                     "index": True,
-                    "type": Index.suffix if basic_index else type_,
+                    "type": Index.suffix if basic_index else amname,
                     "definition": definition,
                     "options": options,
                 }
+
         return constraints

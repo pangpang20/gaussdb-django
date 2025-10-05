@@ -1,7 +1,7 @@
 """
-PostgreSQL database backend for Django.
+Gaussdb database backend for Django.
 
-Requires psycopg2 >= 2.8.4 or psycopg >= 3.1.8
+Requires gaussdb >= 1.0.3
 """
 
 import asyncio
@@ -19,68 +19,45 @@ from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.safestring import SafeString
 from django.utils.version import get_version_tuple
-from django.db.backends.postgresql.base import ServerBindingCursor, CursorDebugWrapper
 
+# from django.db.backends.postgresql.base import DatabaseWrapper as PostgresDatabaseWrapper
 
 try:
     try:
-        import psycopg as Database
+        import gaussdb as Database
     except ImportError:
-        import psycopg2 as Database
+        pass
 except ImportError:
-    raise ImproperlyConfigured("Error loading psycopg2 or psycopg module")
+    raise ImproperlyConfigured("Error loading gaussdb module")
 
 
-def psycopg_version():
+def gaussdb_version():
     version = Database.__version__.split(" ", 1)[0]
     return get_version_tuple(version)
 
 
-if psycopg_version() < (2, 8, 4):
+if gaussdb_version() < (1, 0, 3):
     raise ImproperlyConfigured(
-        f"psycopg2 version 2.8.4 or newer is required; you have {Database.__version__}"
-    )
-if (3,) <= psycopg_version() < (3, 1, 8):
-    raise ImproperlyConfigured(
-        f"psycopg version 3.1.8 or newer is required; you have {Database.__version__}"
+        f"gaussdb version 1.0.3 or newer is required; you have {Database.__version__}"
     )
 
 
-from .psycopg_any import IsolationLevel, is_psycopg3  # NOQA isort:skip
+from .gaussdb_any import IsolationLevel  # NOQA isort:skip
+from gaussdb import adapters, sql
+from gaussdb.pq import Format
 
-if is_psycopg3:
-    from psycopg import adapters, sql
-    from psycopg.pq import Format
+from .gaussdb_any import get_adapters_template, register_tzloader
 
-    from .psycopg_any import get_adapters_template, register_tzloader
+TIMESTAMPTZ_OID = adapters.types["timestamptz"].oid
 
-    TIMESTAMPTZ_OID = adapters.types["timestamptz"].oid
-
-else:
-    import psycopg2.extensions
-    import psycopg2.extras
-
-    psycopg2.extensions.register_adapter(SafeString, psycopg2.extensions.QuotedString)
-    psycopg2.extras.register_uuid()
-
-    # Register support for inet[] manually so we don't have to handle the Inet()
-    # object on load all the time.
-    INETARRAY_OID = 1041
-    INETARRAY = psycopg2.extensions.new_array_type(
-        (INETARRAY_OID,),
-        "INETARRAY",
-        psycopg2.extensions.UNICODE,
-    )
-    psycopg2.extensions.register_type(INETARRAY)
-
-# Some of these import psycopg, so import them after checking if it's installed.
+# Some of these import gaussdb, so import them after checking if it's installed.
 from .client import DatabaseClient  # NOQA isort:skip
 from .creation import DatabaseCreation  # NOQA isort:skip
 from .features import DatabaseFeatures  # NOQA isort:skip
 from .introspection import DatabaseIntrospection  # NOQA isort:skip
 from .operations import DatabaseOperations  # NOQA isort:skip
 from .schema import DatabaseSchemaEditor  # NOQA isort:skip
-
+from .compiler import SQLInsertCompiler
 
 def _get_varchar_column(data):
     if data["max_length"] is None:
@@ -89,9 +66,10 @@ def _get_varchar_column(data):
 
 
 class DatabaseWrapper(BaseDatabaseWrapper):
-    vendor = "postgresql"
-    display_name = "PostgreSQL"
-    # This dictionary maps Field objects to their associated PostgreSQL column
+# class DatabaseWrapper(PostgresDatabaseWrapper):
+    vendor = "postgres"
+    display_name = "GaussDB"
+    # This dictionary maps Field objects to their associated Gaussdb column
     # types, as strings. Column-type strings can contain format strings; they'll
     # be interpolated against the values of Field.__dict__ before being output.
     # If a column type is set to None, it won't be included in the output.
@@ -124,6 +102,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         "TimeField": "time",
         "UUIDField": "uuid",
     }
+
     data_type_check_constraints = {
         "PositiveBigIntegerField": '"%(column)s" >= 0',
         "PositiveIntegerField": '"%(column)s" >= 0',
@@ -179,7 +158,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     features_class = DatabaseFeatures
     introspection_class = DatabaseIntrospection
     ops_class = DatabaseOperations
-    # PostgreSQL backend-specific attributes.
+    # Gaussdb backend-specific attributes.
     _named_cursor_idx = 0
     _connection_pools = {}
 
@@ -199,10 +178,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                 pool_options = {}
 
             try:
-                from psycopg_pool import ConnectionPool
+                from gaussdb_pool import ConnectionPool
             except ImportError as err:
                 raise ImproperlyConfigured(
-                    "Error loading psycopg_pool module.\nDid you install psycopg[pool]?"
+                    "Error loading gaussdb_pool module.\nDid you install gaussdb[pool]?"
                 ) from err
 
             connect_kwargs = self.get_connection_params()
@@ -238,7 +217,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def get_connection_params(self):
         settings_dict = self.settings_dict
-        # None may be used to connect to the default 'postgres' db
+        # None may be used to connect to the default 'gaussdb' db
         if settings_dict["NAME"] == "" and not settings_dict["OPTIONS"].get("service"):
             raise ImproperlyConfigured(
                 "settings.DATABASES is improperly configured. "
@@ -247,7 +226,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         if len(settings_dict["NAME"] or "") > self.ops.max_name_length():
             raise ImproperlyConfigured(
                 "The database name '%s' (%d characters) is longer than "
-                "PostgreSQL's limit of %d characters. Supply a shorter NAME "
+                "Gaussdb's limit of %d characters. Supply a shorter NAME "
                 "in settings.DATABASES."
                 % (
                     settings_dict["NAME"],
@@ -272,15 +251,15 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         conn_params.pop("isolation_level", None)
 
         pool_options = conn_params.pop("pool", None)
-        if pool_options and not is_psycopg3:
-            raise ImproperlyConfigured("Database pooling requires psycopg >= 3")
+        if pool_options:
+            raise ImproperlyConfigured("Database pooling requires gaussdb >= 1.0.3")
 
         server_side_binding = conn_params.pop("server_side_binding", None)
         conn_params.setdefault(
             "cursor_factory",
             (
                 ServerBindingCursor
-                if is_psycopg3 and server_side_binding is True
+                if server_side_binding is True
                 else Cursor
             ),
         )
@@ -292,15 +271,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             conn_params["host"] = settings_dict["HOST"]
         if settings_dict["PORT"]:
             conn_params["port"] = settings_dict["PORT"]
-        if is_psycopg3:
-            conn_params["context"] = get_adapters_template(
-                settings.USE_TZ, self.timezone
-            )
-            # Disable prepared statements by default to keep connection poolers
-            # working. Can be reenabled via OPTIONS in the settings dict.
-            conn_params["prepare_threshold"] = conn_params.pop(
-                "prepare_threshold", None
-            )
+        conn_params["context"] = get_adapters_template(
+            settings.USE_TZ, self.timezone
+        )
+        # Disable prepared statements by default to keep connection poolers
+        # working. Can be reenabled via OPTIONS in the settings dict.
+        conn_params["prepare_threshold"] = conn_params.pop(
+            "prepare_threshold", None
+        )
         return conn_params
 
     @async_unsafe
@@ -324,7 +302,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             except ValueError:
                 raise ImproperlyConfigured(
                     f"Invalid transaction isolation level {isolation_level_value} "
-                    f"specified. Use one of the psycopg.IsolationLevel values."
+                    f"specified. Use one of the gaussdb.IsolationLevel values."
                 )
         if self.pool:
             # If nothing else has opened the pool, open it now.
@@ -334,13 +312,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             connection = self.Database.connect(**conn_params)
         if set_isolation_level:
             connection.isolation_level = self.isolation_level
-        if not is_psycopg3:
-            # Register dummy loads() to avoid a round trip from psycopg2's
-            # decode to json.dumps() to json.loads(), when using a custom
-            # decoder in JSONField.
-            psycopg2.extras.register_default_jsonb(
-                conn_or_curs=connection, loads=lambda x: x
-            )
         return connection
 
     def ensure_timezone(self):
@@ -369,7 +340,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def _configure_connection(self, connection):
         # This function is called from init_connection_state and from the
-        # psycopg pool itself after a connection is opened.
+        # gaussdb pool itself after a connection is opened.
 
         # Commit after setting the time zone.
         commit_tz = self._configure_timezone(connection)
@@ -405,13 +376,35 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             if commit and not self.get_autocommit():
                 self.connection.commit()
 
+        if self.supports_identity_columns():
+            # Use identity (for GaussDB)
+            pass
+        else:
+            # Fall back to serial (for openGauss)
+            self.data_types['AutoField'] = 'serial'
+            self.data_types['BigAutoField'] = 'bigserial'
+            self.data_types['SmallAutoField'] = 'smallserial'
+            self.data_types_suffix = {}
+
+    def supports_identity_columns(self):
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TEMPORARY TABLE test_identity_support (
+                        id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY
+                    )
+                """)
+                cursor.execute("DROP TABLE test_identity_support")
+                return True
+        except Exception:
+            # If syntax error or unsupported, assume no identity support
+            return False
+
     @async_unsafe
     def create_cursor(self, name=None):
         if name:
-            if is_psycopg3 and (
-                self.settings_dict["OPTIONS"].get("server_side_binding") is not True
-            ):
-                # psycopg >= 3 forces the usage of server-side bindings for
+            if self.settings_dict["OPTIONS"].get("server_side_binding") is not True:
+                # gaussdb >= 1.0.3 forces the usage of server-side bindings for
                 # named cursors so a specialized class that implements
                 # server-side cursors while performing client-side bindings
                 # must be used if `server_side_binding` is disabled (default).
@@ -430,14 +423,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         else:
             cursor = self.connection.cursor()
 
-        if is_psycopg3:
-            # Register the cursor timezone only if the connection disagrees, to
-            # avoid copying the adapter map.
-            tzloader = self.connection.adapters.get_loader(TIMESTAMPTZ_OID, Format.TEXT)
-            if self.timezone != tzloader.timezone:
-                register_tzloader(self.timezone, cursor)
-        else:
-            cursor.tzinfo_factory = self.tzinfo_factory if settings.USE_TZ else None
+        tzloader = self.connection.adapters.get_loader(TIMESTAMPTZ_OID, Format.TEXT)
+        if self.timezone != tzloader.timezone:
+            register_tzloader(self.timezone, cursor)
+        
         return cursor
 
     def tzinfo_factory(self, offset):
@@ -488,7 +477,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         if self.connection is None:
             return False
         try:
-            # Use a psycopg cursor directly, bypassing Django's utilities.
+            # Use a gaussdb cursor directly, bypassing Django's utilities.
             with self.connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
         except Database.Error:
@@ -516,12 +505,12 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                 "to avoid running initialization queries against the production "
                 "database when it's not needed (for example, when running tests). "
                 "Django was unable to create a connection to the 'postgres' database "
-                "and will use the first PostgreSQL database instead.",
+                "and will use the first Gaussdb database instead.",
                 RuntimeWarning,
             )
             for connection in connections.all():
                 if (
-                    connection.vendor == "postgresql"
+                    connection.vendor == "postgres"
                     and connection.settings_dict["NAME"] != "postgres"
                 ):
                     conn = self.__class__(
@@ -545,69 +534,74 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         with self.temporary_connection():
             return self.connection.info.server_version
 
+    def check_database_version_supported(self):
+        """
+        Override Django's version check to support GaussDB.
+        GaussDB reports version like 9.204 but is PostgreSQL-compatible.
+        """
+        try:
+            with self.temporary_connection() as conn:
+                server_version = conn.execute("select version()").fetchall()[0][0]
+                print(f"Server Version String: {server_version}")
+                if server_version:
+                    self.pg_version = 140000
+                    return
+        except Exception as e:
+            raise Database.Error(
+                f"Unable to determine server version from server_version parameter: {e}"
+            )
+            
+
     def make_debug_cursor(self, cursor):
         return CursorDebugWrapper(cursor, self)
 
 
-if is_psycopg3:
+class CursorMixin:
+    """
+    A subclass of gaussdb cursor implementing callproc.
+    """
 
-    class CursorMixin:
-        """
-        A subclass of psycopg cursor implementing callproc.
-        """
+    def callproc(self, name, args=None):
+        if not isinstance(name, sql.Identifier):
+            name = sql.Identifier(name)
 
-        def callproc(self, name, args=None):
-            if not isinstance(name, sql.Identifier):
-                name = sql.Identifier(name)
+        qparts = [sql.SQL("SELECT * FROM "), name, sql.SQL("(")]
+        if args:
+            for item in args:
+                qparts.append(sql.Literal(item))
+                qparts.append(sql.SQL(","))
+            del qparts[-1]
 
-            qparts = [sql.SQL("SELECT * FROM "), name, sql.SQL("(")]
-            if args:
-                for item in args:
-                    qparts.append(sql.Literal(item))
-                    qparts.append(sql.SQL(","))
-                del qparts[-1]
+        qparts.append(sql.SQL(")"))
+        stmt = sql.Composed(qparts)
+        self.execute(stmt)
+        return args
 
-            qparts.append(sql.SQL(")"))
-            stmt = sql.Composed(qparts)
-            self.execute(stmt)
-            return args
+# class ServerBindingCursor(CursorMixin, PGServerBindingCursor):
+#     pass
 
-    # class ServerBindingCursor(CursorMixin, PGServerBindingCursor):
-    #     pass
+class Cursor(CursorMixin, Database.ClientCursor):
+    pass
 
-    class Cursor(CursorMixin, Database.ClientCursor):
-        pass
+class ServerSideCursor(
+    CursorMixin, Database.client_cursor.ClientCursorMixin, Database.ServerCursor
+):
+    """
+    gaussdb >= 1.0.3 forces the usage of server-side bindings when using named
+    cursors but the ORM doesn't yet support the systematic generation of
+    prepareable SQL (#20516).
 
-    class ServerSideCursor(
-        CursorMixin, Database.client_cursor.ClientCursorMixin, Database.ServerCursor
-    ):
-        """
-        psycopg >= 3 forces the usage of server-side bindings when using named
-        cursors but the ORM doesn't yet support the systematic generation of
-        prepareable SQL (#20516).
+    ClientCursorMixin forces the usage of client-side bindings while
+    ServerCursor implements the logic required to declare and scroll
+    through named cursors.
 
-        ClientCursorMixin forces the usage of client-side bindings while
-        ServerCursor implements the logic required to declare and scroll
-        through named cursors.
+    Mixing ClientCursorMixin in wouldn't be necessary if Cursor allowed to
+    specify how parameters should be bound instead, which ServerCursor
+    would inherit, but that's not the case.
+    """
 
-        Mixing ClientCursorMixin in wouldn't be necessary if Cursor allowed to
-        specify how parameters should be bound instead, which ServerCursor
-        would inherit, but that's not the case.
-        """
+class CursorDebugWrapper(BaseCursorDebugWrapper):
+    def copy(self, statement):
+        with self.debug_sql(statement):
+            return self.cursor.copy(statement)
 
-    class CursorDebugWrapper(BaseCursorDebugWrapper):
-        def copy(self, statement):
-            with self.debug_sql(statement):
-                return self.cursor.copy(statement)
-
-else:
-    Cursor = psycopg2.extensions.cursor
-
-    class CursorDebugWrapper(BaseCursorDebugWrapper):
-        def copy_expert(self, sql, file, *args):
-            with self.debug_sql(sql):
-                return self.cursor.copy_expert(sql, file, *args)
-
-        def copy_to(self, file, table, *args, **kwargs):
-            with self.debug_sql(sql="COPY %s TO STDOUT" % table):
-                return self.cursor.copy_to(file, table, *args, **kwargs)

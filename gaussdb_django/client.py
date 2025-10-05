@@ -4,7 +4,7 @@ from django.db.backends.base.client import BaseDatabaseClient
 
 
 class DatabaseClient(BaseDatabaseClient):
-    executable_name = "psql"
+    executable_name = "gsql"
 
     @classmethod
     def settings_to_cmd_args_env(cls, settings_dict, parameters):
@@ -38,19 +38,19 @@ class DatabaseClient(BaseDatabaseClient):
 
         env = {}
         if passwd:
-            env["PGPASSWORD"] = str(passwd)
+            env["GAUSSDBPASSWORD"] = str(passwd)
         if service:
-            env["PGSERVICE"] = str(service)
+            env["GAUSSDBSERVICE"] = str(service)
         if sslmode:
-            env["PGSSLMODE"] = str(sslmode)
+            env["GAUSSDBSSLMODE"] = str(sslmode)
         if sslrootcert:
-            env["PGSSLROOTCERT"] = str(sslrootcert)
+            env["GAUSSDBSSLROOTCERT"] = str(sslrootcert)
         if sslcert:
-            env["PGSSLCERT"] = str(sslcert)
+            env["GAUSSDBSSLCERT"] = str(sslcert)
         if sslkey:
-            env["PGSSLKEY"] = str(sslkey)
+            env["GAUSSDBSSLKEY"] = str(sslkey)
         if passfile:
-            env["PGPASSFILE"] = str(passfile)
+            env["GAUSSDBPASSFILE"] = str(passfile)
         return args, (env or None)
 
     def runshell(self, parameters):

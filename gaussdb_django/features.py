@@ -2,8 +2,8 @@ import operator
 
 from django.db import DataError, InterfaceError
 from django.db.backends.base.features import BaseDatabaseFeatures
-from django.db.backends.postgresql.psycopg_any import is_psycopg3
 from django.utils.functional import cached_property
+# from django.db.backends.postgresql.features import DatabaseFeatures as PostgreSQLFeatures
 
 
 class DatabaseFeatures(BaseDatabaseFeatures):
@@ -67,6 +67,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_stored_generated_columns = True
     supports_virtual_generated_columns = False
     can_rename_index = True
+    is_postgresql_9_4 = False
     test_collations = {
         "deterministic": "C",
         "non_default": "sv-x-icu",
@@ -79,11 +80,11 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     @cached_property
     def django_test_skips(self):
         skips = {
-            "opclasses are PostgreSQL only.": {
-                "indexes.tests.SchemaIndexesNotPostgreSQLTests."
+            "opclasses are GaussDB only.": {
+                "indexes.tests.SchemaIndexesNotGaussDBTests."
                 "test_create_index_ignores_opclasses",
             },
-            "PostgreSQL requires casting to text.": {
+            "GaussDB requires casting to text.": {
                 "lookup.tests.LookupTests.test_textfield_exact_null",
             },
         }
@@ -127,14 +128,11 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     @cached_property
     def uses_server_side_binding(self):
         options = self.connection.settings_dict["OPTIONS"]
-        return is_psycopg3 and options.get("server_side_binding") is True
+        return options.get("server_side_binding") is True
 
     @cached_property
     def prohibits_null_characters_in_text_exception(self):
-        if is_psycopg3:
-            return DataError, "PostgreSQL text fields cannot contain NUL (0x00) bytes"
-        else:
-            return ValueError, "A string literal cannot contain NUL (0x00) characters."
+        return DataError, "GaussDB text fields cannot contain NUL (0x00) bytes"
 
     @cached_property
     def introspected_field_types(self):
@@ -145,19 +143,5 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             "PositiveSmallIntegerField": "SmallIntegerField",
         }
 
-    @cached_property
-    def is_postgresql_15(self):
-        return self.connection.pg_version >= 150000
-
-    @cached_property
-    def is_postgresql_16(self):
-        return self.connection.pg_version >= 160000
-
-    @cached_property
-    def is_postgresql_17(self):
-        return self.connection.pg_version >= 170000
-
     supports_unlimited_charfield = True
-    supports_nulls_distinct_unique_constraints = property(
-        operator.attrgetter("is_postgresql_15")
-    )
+    supports_nulls_distinct_unique_constraints = False

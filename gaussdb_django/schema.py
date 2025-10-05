@@ -1,3 +1,5 @@
+import re
+
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
 from django.db.backends.postgresql.psycopg_any import sql
@@ -368,13 +370,23 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _is_collation_deterministic(self, collation_name):
         with self.connection.cursor() as cursor:
+            # 先检查 pg_collation 表里有没有 collisdeterministic 这一列
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM pg_attribute a
+                JOIN pg_class c ON a.attrelid = c.oid
+                WHERE c.relname = 'pg_collation' AND a.attname = 'collisdeterministic'
+            """)
+            has_column = cursor.fetchone()[0] > 0
+
+            if not has_column:
+                # GaussDB 或老版本 PG，直接返回 None
+                return None
+
             cursor.execute(
-                """
-                SELECT collisdeterministic
-                FROM pg_collation
-                WHERE collname = %s
-                """,
+                "SELECT collisdeterministic FROM pg_collation WHERE collname = %s",
                 [collation_name],
             )
             row = cursor.fetchone()
             return row[0] if row else None
+

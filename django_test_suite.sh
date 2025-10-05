@@ -36,6 +36,6 @@ pip3 install -r "$DJANGO_TESTS_DIR/django/tests/requirements/postgres.txt"
 EXIT_STATUS=0
 for DJANGO_TEST_APP in $DJANGO_TEST_APPS; do
    python3 "$DJANGO_TESTS_DIR/django/tests/runtests.py" "$DJANGO_TEST_APP" \
-      --noinput --settings gaussdb_settings || EXIT_STATUS=$?
+      --noinput --settings gaussdb_settings --parallel=1 || EXIT_STATUS=$?
 done
 exit $EXIT_STATUS

@@ -2,7 +2,7 @@ import sys
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.backends.base.creation import BaseDatabaseCreation
-from django.db.backends.postgresql.psycopg_any import errors
+from .gaussdb_any import errors
 from django.db.backends.utils import strip_quotes
 
 
@@ -22,7 +22,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         test_settings = self.connection.settings_dict["TEST"]
         if test_settings.get("COLLATION") is not None:
             raise ImproperlyConfigured(
-                "PostgreSQL does not support collation setting at database "
+                "GaussDB does not support collation setting at database "
                 "creation time."
             )
         return self._get_database_create_suffix(

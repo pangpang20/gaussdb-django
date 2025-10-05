@@ -4,11 +4,10 @@ from functools import lru_cache, partial
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
 from django.db.backends.postgresql.compiler import InsertUnnest
-from django.db.backends.postgresql.psycopg_any import (
+from .gaussdb_any import (
     Inet,
     Jsonb,
     errors,
-    is_psycopg3,
     mogrify,
 )
 from django.db.backends.utils import split_tzname_delta
@@ -49,17 +48,16 @@ class DatabaseOperations(BaseDatabaseOperations):
         "SmallAutoField": "smallint",
     }
 
-    if is_psycopg3:
-        from psycopg.types import numeric
+    from gaussdb.types import numeric
 
-        integerfield_type_map = {
-            "SmallIntegerField": numeric.Int2,
-            "IntegerField": numeric.Int4,
-            "BigIntegerField": numeric.Int8,
-            "PositiveSmallIntegerField": numeric.Int2,
-            "PositiveIntegerField": numeric.Int4,
-            "PositiveBigIntegerField": numeric.Int8,
-        }
+    integerfield_type_map = {
+        "SmallIntegerField": numeric.Int2,
+        "IntegerField": numeric.Int4,
+        "BigIntegerField": numeric.Int8,
+        "PositiveSmallIntegerField": numeric.Int2,
+        "PositiveIntegerField": numeric.Int4,
+        "PositiveBigIntegerField": numeric.Int8,
+    }
 
     def unification_cast_sql(self, output_field):
         internal_type = output_field.get_internal_type()
@@ -302,26 +300,15 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return ["DISTINCT"], []
 
-    if is_psycopg3:
-
-        def last_executed_query(self, cursor, sql, params):
-            if self.connection.features.uses_server_side_binding:
-                try:
-                    return self.compose_sql(sql, params)
-                except errors.DataError:
-                    return None
-            else:
-                if cursor._query and cursor._query.query is not None:
-                    return cursor._query.query.decode()
+    def last_executed_query(self, cursor, sql, params):
+        if self.connection.features.uses_server_side_binding:
+            try:
+                return self.compose_sql(sql, params)
+            except errors.DataError:
                 return None
-
-    else:
-
-        def last_executed_query(self, cursor, sql, params):
-            # https://www.psycopg.org/docs/cursor.html#cursor.query
-            # The query attribute is a Psycopg extension to the DB API 2.0.
-            if cursor.query is not None:
-                return cursor.query.decode()
+        else:
+            if cursor._query and cursor._query.query is not None:
+                return cursor._query.query.decode()
             return None
 
     def return_insert_columns(self, fields):
@@ -337,12 +324,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         ]
         return "RETURNING %s" % ", ".join(columns), ()
 
-    if is_psycopg3:
-
-        def adapt_integerfield_value(self, value, internal_type):
-            if value is None or hasattr(value, "resolve_expression"):
-                return value
-            return self.integerfield_type_map[internal_type](value)
+    def adapt_integerfield_value(self, value, internal_type):
+        if value is None or hasattr(value, "resolve_expression"):
+            return value
+        return self.integerfield_type_map[internal_type](value)
 
     def adapt_datefield_value(self, value):
         return value

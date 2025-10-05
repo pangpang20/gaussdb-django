@@ -2,20 +2,19 @@ import ipaddress
 from functools import lru_cache
 
 try:
-    from psycopg import ClientCursor, IsolationLevel, adapt, adapters, errors, sql
-    from psycopg.postgres import types
-    from psycopg.types.datetime import TimestamptzLoader
-    from psycopg.types.json import Jsonb
-    from psycopg.types.range import Range, RangeDumper
-    from psycopg.types.string import TextLoader
+    from gaussdb import ClientCursor, IsolationLevel, adapt, adapters, errors, sql
+    from gaussdb.types.datetime import TimestamptzLoader
+    from gaussdb.types.json import Jsonb
+    from gaussdb.types.range import Range, RangeDumper
+    from gaussdb.types.string import TextLoader
 
     Inet = ipaddress.ip_address
 
     DateRange = DateTimeRange = DateTimeTZRange = NumericRange = Range
     RANGE_TYPES = (Range,)
 
-    TSRANGE_OID = types["tsrange"].oid
-    TSTZRANGE_OID = types["tstzrange"].oid
+    TSRANGE_OID = "tsrange"
+    TSTZRANGE_OID = "tstzrange"
 
     def mogrify(sql, params, connection):
         with connection.cursor() as cursor:
@@ -24,7 +23,7 @@ try:
     # Adapters.
     class BaseTzLoader(TimestamptzLoader):
         """
-        Load a PostgreSQL timestamptz using the a specific timezone.
+        Load a Gaussdb timestamptz using the a specific timezone.
         The timezone can be None too, in which case it will be chopped.
         """
 
@@ -55,11 +54,11 @@ try:
     def get_adapters_template(use_tz, timezone):
         # Create at adapters map extending the base one.
         ctx = adapt.AdaptersMap(adapters)
-        # Register a no-op dumper to avoid a round trip from psycopg version 3
+        # Register a no-op dumper to avoid a round trip from gaussdb
         # decode to json.dumps() to json.loads(), when using a custom decoder
         # in JSONField.
         ctx.register_loader("jsonb", TextLoader)
-        # Don't convert automatically from PostgreSQL network types to Python
+        # Don't convert automatically from Gaussdb network types to Python
         # ipaddress.
         ctx.register_loader("inet", TextLoader)
         ctx.register_loader("cidr", TextLoader)
@@ -69,46 +68,5 @@ try:
         register_tzloader(timezone, ctx)
         return ctx
 
-    is_psycopg3 = True
-
-except ImportError:
-    from enum import IntEnum
-
-    from psycopg2 import errors, extensions, sql  # NOQA
-    from psycopg2.extras import (  # NOQA
-        DateRange,
-        DateTimeRange,
-        DateTimeTZRange,
-        Inet,
-        Json,
-        NumericRange,
-        Range,
-    )
-
-    RANGE_TYPES = (DateRange, DateTimeRange, DateTimeTZRange, NumericRange)
-
-    class IsolationLevel(IntEnum):
-        READ_UNCOMMITTED = extensions.ISOLATION_LEVEL_READ_UNCOMMITTED
-        READ_COMMITTED = extensions.ISOLATION_LEVEL_READ_COMMITTED
-        REPEATABLE_READ = extensions.ISOLATION_LEVEL_REPEATABLE_READ
-        SERIALIZABLE = extensions.ISOLATION_LEVEL_SERIALIZABLE
-
-    def _quote(value, connection=None):
-        adapted = extensions.adapt(value)
-        if hasattr(adapted, "encoding"):
-            adapted.encoding = "utf8"
-        # getquoted() returns a quoted bytestring of the adapted value.
-        return adapted.getquoted().decode()
-
-    sql.quote = _quote
-
-    def mogrify(sql, params, connection):
-        with connection.cursor() as cursor:
-            return cursor.mogrify(sql, params).decode()
-
-    is_psycopg3 = False
-
-    class Jsonb(Json):
-        def getquoted(self):
-            quoted = super().getquoted()
-            return quoted + b"::jsonb"
+except ImportError as e:
+    raise ImportError(f"Failed to import gaussdb module: {e}")
