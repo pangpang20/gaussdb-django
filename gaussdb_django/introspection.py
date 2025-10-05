@@ -180,7 +180,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         return {row[0]: (row[2], row[1]) for row in cursor.fetchall()}
 
-    def parse_indexdef(defn: str):
+    def parse_indexdef(self, defn: str):
         """
         从 pg_get_indexdef() 解析列名和排序 (ASC/DESC)。
         """
@@ -270,7 +270,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         )
         for index, unique, primary, definition, options, amname in cursor.fetchall():
             if index not in constraints:
-                columns, orders = parse_indexdef(definition)
+                columns, orders = self.parse_indexdef(definition)
                 basic_index = (
                     amname == self.index_default_access_method
                     and not index.endswith("_btree")
