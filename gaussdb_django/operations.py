@@ -3,7 +3,7 @@ from functools import lru_cache, partial
 
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
-from django.db.backends.postgresql.compiler import InsertUnnest
+from .compiler import InsertUnnest
 from .gaussdb_any import (
     Inet,
     Jsonb,

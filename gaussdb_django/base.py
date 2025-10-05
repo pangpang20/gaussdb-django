@@ -57,7 +57,6 @@ from .features import DatabaseFeatures  # NOQA isort:skip
 from .introspection import DatabaseIntrospection  # NOQA isort:skip
 from .operations import DatabaseOperations  # NOQA isort:skip
 from .schema import DatabaseSchemaEditor  # NOQA isort:skip
-from .compiler import SQLInsertCompiler
 
 def _get_varchar_column(data):
     if data["max_length"] is None:
@@ -66,7 +65,6 @@ def _get_varchar_column(data):
 
 
 class DatabaseWrapper(BaseDatabaseWrapper):
-# class DatabaseWrapper(PostgresDatabaseWrapper):
     vendor = "postgres"
     display_name = "GaussDB"
     # This dictionary maps Field objects to their associated Gaussdb column

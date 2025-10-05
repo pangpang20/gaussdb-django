@@ -2,7 +2,7 @@ import re
 
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
-from django.db.backends.postgresql.psycopg_any import sql
+from .gaussdb_any import sql
 from django.db.backends.utils import strip_quotes
 
 
