@@ -42,7 +42,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_delete_procedure = "DROP FUNCTION %(procedure)s(%(param_types)s)"
 
     def execute(self, sql, params=()):
-        # Merge the query client-side, as PostgreSQL won't do it server-side.
+        # Merge the query client-side, as GaussDB won't do it server-side.
         if params is None:
             return super().execute(sql, params)
         sql = self.connection.ops.compose_sql(str(sql), params)
@@ -56,6 +56,24 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_drop_identity = (
         "ALTER TABLE %(table)s ALTER COLUMN %(column)s DROP IDENTITY IF EXISTS"
     )
+    sql_add_column = (
+        "ALTER TABLE %(table)s ADD COLUMN %(column)s %(type)s"
+    )
+    sql_drop_column = (
+        "ALTER TABLE %(table)s DROP COLUMN %(column)s"
+    )
+    sql_copy_column = (
+        "UPDATE %(table)s SET %(new_column)s = %(column)s"
+    )
+    sql_rename_column_new = (
+        "ALTER TABLE %(table)s RENAME COLUMN %(new_column)s TO %(column)s"
+    )
+    sql_add_fk_constraint = (
+        "ALTER TABLE %(table)s "
+        "ADD CONSTRAINT %(constraint)s "
+        "FOREIGN KEY (%(column)s) REFERENCES %(ref_table)s (%(ref_column)s)"
+    )
+    
 
     def quote_value(self, value):
         return sql.quote(value, self.connection.connection)
@@ -98,7 +116,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             # and text[size], so skip them.
             if "[" in db_type:
                 return None
-            # Non-deterministic collations on Postgresql don't support indexes
+            # Non-deterministic collations on GaussDB don't support indexes
             # for operator classes varchar_pattern_ops/text_pattern_ops.
             collation_name = getattr(field, "db_collation", None)
             if not collation_name and field.is_relation:
@@ -205,21 +223,49 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 ],
             )
         elif old_is_auto and not new_is_auto:
-            # Drop IDENTITY if exists (pre-Django 4.1 serial columns don't have
-            # it).
+            column = strip_quotes(old_field.column)
+            new_column = f"{column}_new"
+            fk_constraints = self._get_foreign_key_constraints(table, column)
+            for fk in fk_constraints:
+                self.execute(
+                    self.sql_delete_fk
+                    % {
+                        "table": self.quote_name(fk["table"]),
+                        "name": self.quote_name(fk["constraint"]),
+                    },
+                )
             self.execute(
-                self.sql_drop_identity
+                self.sql_add_column
                 % {
                     "table": self.quote_name(table),
-                    "column": self.quote_name(strip_quotes(new_field.column)),
-                }
+                    "column": self.quote_name(new_column),
+                    "type": new_type,
+                },
             )
-            column = strip_quotes(new_field.column)
-            fragment, _ = super()._alter_column_type_sql(
-                model, old_field, new_field, new_type, old_collation, new_collation
+            self.execute(
+                self.sql_copy_column
+                % {
+                    "table": self.quote_name(table),
+                    "new_column": self.quote_name(new_column),
+                    "column": self.quote_name(column),
+                },
             )
-            # Drop the sequence if exists (Django 4.1+ identity columns don't
-            # have it).
+            self.execute(
+                self.sql_drop_column
+                % {
+                    "table": self.quote_name(table),
+                    "column": self.quote_name(column),
+                },
+            )
+            self.execute(
+                self.sql_rename_column_new
+                % {
+                    "table": self.quote_name(table),
+                    "new_column": self.quote_name(new_column),
+                    "column": self.quote_name(column),
+                },
+            )
+            
             other_actions = []
             if sequence_name := self._get_sequence_name(table, column):
                 other_actions = [
@@ -231,7 +277,18 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         [],
                     )
                 ]
-            return fragment, other_actions
+            for fk in fk_constraints:
+                self.execute(
+                    self.sql_add_fk_constraint
+                    % {
+                        "table": self.quote_name(fk['table']),
+                        "constraint": self.quote_name(fk['constraint']),
+                        "column": self.quote_name(fk['column']),
+                        "ref_table": self.quote_name(table),
+                        "ref_column": self.quote_name(column),
+                    },
+                )
+            return (("", []), []), other_actions
         elif new_is_auto and old_is_auto and old_internal_type != new_internal_type:
             fragment, _ = super()._alter_column_type_sql(
                 model, old_field, new_field, new_type, old_collation, new_collation
@@ -261,6 +318,27 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return super()._alter_column_type_sql(
                 model, old_field, new_field, new_type, old_collation, new_collation
             )
+    def _get_foreign_key_constraints(self, table, column):
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    c.conname AS constraint_name,
+                    c.conrelid::regclass AS table_name,
+                    a.attname AS column_name
+                FROM pg_constraint c
+                JOIN pg_class t ON c.conrelid = t.oid
+                JOIN pg_attribute a ON a.attnum = c.conkey[1] AND a.attrelid = t.oid
+                WHERE c.contype = 'f'
+                    AND c.confrelid = (SELECT oid FROM pg_class WHERE relname = %s)
+                    AND c.confkey[1] = (SELECT attnum FROM pg_attribute WHERE attrelid = (SELECT oid FROM pg_class WHERE relname = %s) AND attname = %s)
+                """,
+                [table, table, column],
+            )
+            return [
+                {"constraint": row[0], "table": row[1], "column": row[2]}
+                for row in cursor.fetchall()
+            ]
 
     def _alter_field(
         self,
@@ -283,7 +361,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             new_db_params,
             strict,
         )
-        # Added an index? Create any PostgreSQL-specific indexes.
+        # Added an index? Create any GaussDB-specific indexes.
         if (
             (not (old_field.db_index or old_field.unique) and new_field.db_index)
             or (not old_field.unique and new_field.unique)
@@ -297,7 +375,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             if like_index_statement is not None:
                 self.execute(like_index_statement)
 
-        # Removed an index? Drop any PostgreSQL-specific indexes.
+        # Removed an index? Drop any GaussDB-specific indexes.
         if old_field.unique and not (new_field.db_index or new_field.unique):
             index_to_remove = self._create_index_name(
                 model._meta.db_table, [old_field.column], suffix="_like"
