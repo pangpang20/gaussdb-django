@@ -65,7 +65,7 @@ def _get_varchar_column(data):
 
 
 class DatabaseWrapper(BaseDatabaseWrapper):
-    vendor = "postgres"
+    vendor = "gaussdb"
     display_name = "GaussDB"
     # This dictionary maps Field objects to their associated Gaussdb column
     # types, as strings. Column-type strings can contain format strings; they'll
@@ -508,7 +508,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             )
             for connection in connections.all():
                 if (
-                    connection.vendor == "postgres"
+                    connection.vendor == "gaussdb"
                     and connection.settings_dict["NAME"] != "postgres"
                 ):
                     conn = self.__class__(

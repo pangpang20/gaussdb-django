@@ -57,30 +57,63 @@ CACHES = {
     }
 }
 
-# from django.db.models.query import QuerySet
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    'migrations',
+    'migrations.test_migrations',
+    'migrations.test_migrations_conflict',
+    'migrations.test_migrations_no_default',
+]
 
-# def patched_batched_insert(self, objs, fields, returning_fields, *args, **kwargs):
-#     print(f"[GaussDB Patch] bulk_insert called: {len(objs)} objs, returning_fields={returning_fields}")
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
 
-#     returned_columns = []
-#     for obj in objs:
-#         try:
-#             res = self._insert([obj], fields, returning_fields, *args, **kwargs)
-#             if res:
-#                 returned_columns.extend(res)
-#         except Exception as e:
-#             print(f"[GaussDB Patch] Insert failed for {obj}: {e}")
-#             returned_columns.append([None])
 
-#     if not returned_columns:
-#         returned_columns = [[None] for _ in objs]
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
 
-#     if len(returned_columns) != len(objs):
-#         print(f"[GaussDB Patch] correcting length: got {len(returned_columns)}, need {len(objs)}")
-#         while len(returned_columns) < len(objs):
-#             returned_columns.append([None])
-#         returned_columns = returned_columns[:len(objs)]
-
-#     return returned_columns
-
-# QuerySet._batched_insert = patched_batched_insert
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/tmp/django_debug.log',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'level': 'DEBUG',
+            'handlers': ['file', 'console'],
+        },
+    },
+}

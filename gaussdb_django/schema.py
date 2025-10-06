@@ -1,5 +1,3 @@
-import re
-
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
 from .gaussdb_any import sql
@@ -56,24 +54,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_drop_identity = (
         "ALTER TABLE %(table)s ALTER COLUMN %(column)s DROP IDENTITY IF EXISTS"
     )
-    sql_add_column = (
-        "ALTER TABLE %(table)s ADD COLUMN %(column)s %(type)s"
-    )
-    sql_drop_column = (
-        "ALTER TABLE %(table)s DROP COLUMN %(column)s"
-    )
-    sql_copy_column = (
-        "UPDATE %(table)s SET %(new_column)s = %(column)s"
-    )
-    sql_rename_column_new = (
-        "ALTER TABLE %(table)s RENAME COLUMN %(new_column)s TO %(column)s"
-    )
-    sql_add_fk_constraint = (
-        "ALTER TABLE %(table)s "
-        "ADD CONSTRAINT %(constraint)s "
-        "FOREIGN KEY (%(column)s) REFERENCES %(ref_table)s (%(ref_column)s)"
-    )
-    
 
     def quote_value(self, value):
         return sql.quote(value, self.connection.connection)
@@ -223,49 +203,25 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 ],
             )
         elif old_is_auto and not new_is_auto:
-            column = strip_quotes(old_field.column)
-            new_column = f"{column}_new"
-            fk_constraints = self._get_foreign_key_constraints(table, column)
-            for fk in fk_constraints:
+            # Drop IDENTITY if exists (pre-Django 4.1 serial columns don't have
+            # it).
+            vendor = self.connection.vendor
+            if vendor == "gaussdb":
+                pass
+            else:
                 self.execute(
-                    self.sql_delete_fk
+                    self.sql_drop_identity
                     % {
-                        "table": self.quote_name(fk["table"]),
-                        "name": self.quote_name(fk["constraint"]),
-                    },
+                        "table": self.quote_name(table),
+                        "column": self.quote_name(strip_quotes(new_field.column)),
+                    }
                 )
-            self.execute(
-                self.sql_add_column
-                % {
-                    "table": self.quote_name(table),
-                    "column": self.quote_name(new_column),
-                    "type": new_type,
-                },
+            column = strip_quotes(new_field.column)
+            fragment, _ = super()._alter_column_type_sql(
+                model, old_field, new_field, new_type, old_collation, new_collation
             )
-            self.execute(
-                self.sql_copy_column
-                % {
-                    "table": self.quote_name(table),
-                    "new_column": self.quote_name(new_column),
-                    "column": self.quote_name(column),
-                },
-            )
-            self.execute(
-                self.sql_drop_column
-                % {
-                    "table": self.quote_name(table),
-                    "column": self.quote_name(column),
-                },
-            )
-            self.execute(
-                self.sql_rename_column_new
-                % {
-                    "table": self.quote_name(table),
-                    "new_column": self.quote_name(new_column),
-                    "column": self.quote_name(column),
-                },
-            )
-            
+            # Drop the sequence if exists (Django 4.1+ identity columns don't
+            # have it).
             other_actions = []
             if sequence_name := self._get_sequence_name(table, column):
                 other_actions = [
@@ -277,18 +233,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         [],
                     )
                 ]
-            for fk in fk_constraints:
-                self.execute(
-                    self.sql_add_fk_constraint
-                    % {
-                        "table": self.quote_name(fk['table']),
-                        "constraint": self.quote_name(fk['constraint']),
-                        "column": self.quote_name(fk['column']),
-                        "ref_table": self.quote_name(table),
-                        "ref_column": self.quote_name(column),
-                    },
-                )
-            return (("", []), []), other_actions
+            return fragment, other_actions
         elif new_is_auto and old_is_auto and old_internal_type != new_internal_type:
             fragment, _ = super()._alter_column_type_sql(
                 model, old_field, new_field, new_type, old_collation, new_collation
@@ -318,27 +263,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return super()._alter_column_type_sql(
                 model, old_field, new_field, new_type, old_collation, new_collation
             )
-    def _get_foreign_key_constraints(self, table, column):
-        with self.connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                    c.conname AS constraint_name,
-                    c.conrelid::regclass AS table_name,
-                    a.attname AS column_name
-                FROM pg_constraint c
-                JOIN pg_class t ON c.conrelid = t.oid
-                JOIN pg_attribute a ON a.attnum = c.conkey[1] AND a.attrelid = t.oid
-                WHERE c.contype = 'f'
-                    AND c.confrelid = (SELECT oid FROM pg_class WHERE relname = %s)
-                    AND c.confkey[1] = (SELECT attnum FROM pg_attribute WHERE attrelid = (SELECT oid FROM pg_class WHERE relname = %s) AND attname = %s)
-                """,
-                [table, table, column],
-            )
-            return [
-                {"constraint": row[0], "table": row[1], "column": row[2]}
-                for row in cursor.fetchall()
-            ]
 
     def _alter_field(
         self,
@@ -448,7 +372,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _is_collation_deterministic(self, collation_name):
         with self.connection.cursor() as cursor:
-            # 先检查 pg_collation 表里有没有 collisdeterministic 这一列
             cursor.execute("""
                 SELECT COUNT(*)
                 FROM pg_attribute a
@@ -458,7 +381,6 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             has_column = cursor.fetchone()[0] > 0
 
             if not has_column:
-                # GaussDB 或老版本 PG，直接返回 None
                 return None
 
             cursor.execute(
