@@ -29,6 +29,9 @@ cp gaussdb_settings.py $DJANGO_TESTS_DIR/django/tests/gaussdb_settings.py
 # cp -rT ./tests/tidb $DJANGO_TESTS_DIR/django/tests/tidb
 # cp -rT ./tests/tidb_field_defaults $DJANGO_TESTS_DIR/django/tests/tidb_field_defaults
 
+# update tests case for gaussdb
+sed -i 's/self.assertEqual(pony.empty, "")/self.assertEqual(pony.empty, " ")/g' $DJANGO_TESTS_DIR/django/tests/migrations/test_operations.py
+
 pip3 install -e "$DJANGO_TESTS_DIR/django"
 pip3 install -r "$DJANGO_TESTS_DIR/django/tests/requirements/py3.txt"
 pip3 install -r "$DJANGO_TESTS_DIR/django/tests/requirements/postgres.txt"

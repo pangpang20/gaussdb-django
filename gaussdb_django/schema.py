@@ -1,7 +1,7 @@
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
 from .gaussdb_any import sql
-from django.db.backends.utils import strip_quotes
+from django.db.backends.utils import strip_quotes, split_identifier
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -55,8 +55,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         "ALTER TABLE %(table)s ALTER COLUMN %(column)s DROP IDENTITY IF EXISTS"
     )
 
-    def quote_value(self, value):
-        return sql.quote(value, self.connection.connection)
+    # def quote_value(self, value):
+    #     return sql.quote(value, self.connection.connection)
 
     def _field_indexes_sql(self, model, field):
         output = super()._field_indexes_sql(model, field)
@@ -390,3 +390,83 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             row = cursor.fetchone()
             return row[0] if row else None
 
+    sql_create_column = "ALTER TABLE %(table)s ADD COLUMN %(column)s %(definition)s"
+    sql_update_with_default = "UPDATE %(table)s SET %(column)s = %(value)s"
+    sql_alter_column_not_null = "ALTER COLUMN %(column)s SET NOT NULL"
+
+    def add_field(self, model, field):
+        is_gaussdb = self.connection.vendor == 'gaussdb'
+        if is_gaussdb and not field.null and self.effective_default(field) == '':
+            table = model._meta.db_table
+            column = self.quote_name(field.column)
+            definition, params = self.column_sql(model, field, include_default=True)
+            if definition is None:
+                return
+            if col_type_suffix := field.db_type_suffix(connection=self.connection):
+                definition += f" {col_type_suffix}"
+
+            temp_definition = definition.replace(" NOT NULL", "")
+            self.execute(
+                self.sql_create_column
+                % {
+                    "table": self.quote_name(table),
+                    "column": column,
+                    "definition": temp_definition,
+                },
+                params,
+            )
+            temp_value = ' '
+            self.execute(
+                self.sql_update_with_default
+                % {
+                    "table": self.quote_name(table),
+                    "column": column,
+                    "value": self.quote_value(temp_value),
+                }
+            )
+            self.execute(
+                self.sql_alter_column
+                % {
+                    "table": self.quote_name(table),
+                    "changes": self.sql_alter_column_not_null % {"column": column},
+                }
+            )
+            if (
+                not field.has_db_default()
+                and not self.skip_default_on_alter(field)
+                and self.effective_default(field) is not None
+            ):
+                changes_sql, params = self._alter_column_default_sql(
+                    model, None, field, drop=True
+                )
+                sql = self.sql_alter_column % {
+                    "table": self.quote_name(table),
+                    "changes": changes_sql,
+                }
+                self.execute(sql, params)
+            if (
+                field.db_comment
+                and self.connection.features.supports_comments
+                and not self.connection.features.supports_comments_inline
+            ):
+                db_params = field.db_parameters(connection=self.connection)
+                field_type = db_params["type"]
+                self.execute(
+                    *self._alter_column_comment_sql(
+                        model, field, field_type, field.db_comment
+                    )
+                )
+            self.deferred_sql.extend(self._field_indexes_sql(model, field))
+            if self.connection.features.connection_persists_old_columns:
+                self.connection.close()
+            return
+        return super().add_field(model, field)
+
+    def quote_value(self, value):
+        if isinstance(value, str):
+            return "'%s'" % value.replace("'", "''")
+        elif value is None:
+            return 'NULL'
+        elif isinstance(value, bool):
+            return 'TRUE' if value else 'FALSE'
+        return str(value)
