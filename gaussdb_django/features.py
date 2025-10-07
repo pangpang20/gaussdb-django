@@ -63,16 +63,20 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     json_key_contains_list_matching_requires_list = True
     supports_update_conflicts = True
     supports_update_conflicts_with_target = True
-    supports_covering_indexes = True
-    supports_stored_generated_columns = True
+    supports_covering_indexes = False
+    supports_stored_generated_columns = False
     supports_virtual_generated_columns = False
     can_rename_index = True
     is_postgresql_9_4 = False
+    supports_multiple_alter_column = False
+    supports_alter_column_to_serial = False
+    supports_table_check_constraints = False
+    supports_alter_field_with_to_field = False
     test_collations = {
         "deterministic": "C",
-        "non_default": "sv-x-icu",
-        "swedish_ci": "sv-x-icu",
-        "virtual": "sv-x-icu",
+        "non_default": "sv_SE.utf8",
+        "swedish_ci": "sv_SE.utf8",
+        "virtual": "sv_SE.utf8",
     }
     test_now_utc_template = "STATEMENT_TIMESTAMP() AT TIME ZONE 'UTC'"
     insert_test_table_with_defaults = "INSERT INTO {} DEFAULT VALUES"

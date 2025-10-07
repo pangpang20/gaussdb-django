@@ -1,3 +1,5 @@
+import re
+
 from django.db.models.sql.compiler import (
     SQLAggregateCompiler,
     SQLCompiler,
@@ -5,6 +7,7 @@ from django.db.models.sql.compiler import (
 )
 from django.db.models.sql.compiler import SQLInsertCompiler as BaseSQLInsertCompiler
 from django.db.models.sql.compiler import SQLUpdateCompiler
+from django.db import connection
 
 __all__ = [
     "SQLAggregateCompiler",
@@ -30,5 +33,4 @@ class SQLInsertCompiler(BaseSQLInsertCompiler):
         return super().assemble_as_sql(fields, value_rows)
 
     def as_sql(self):
-        self.connection.features.is_postgresql_9_4 = False
         return super().as_sql()

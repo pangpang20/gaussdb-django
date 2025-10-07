@@ -3,7 +3,6 @@ Gaussdb database backend for Django.
 
 Requires gaussdb >= 1.0.3
 """
-
 import asyncio
 import threading
 import warnings
@@ -12,7 +11,7 @@ from contextlib import contextmanager
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError as WrappedDatabaseError
-from django.db import connections
+from django.db import connections, connection
 from django.db.backends.base.base import NO_DB_ALIAS, BaseDatabaseWrapper
 from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from django.utils.asyncio import async_unsafe
@@ -575,8 +574,8 @@ class CursorMixin:
         self.execute(stmt)
         return args
 
-# class ServerBindingCursor(CursorMixin, PGServerBindingCursor):
-#     pass
+class ServerBindingCursor(CursorMixin, Database.Cursor):
+    pass
 
 class Cursor(CursorMixin, Database.ClientCursor):
     pass
@@ -602,4 +601,3 @@ class CursorDebugWrapper(BaseCursorDebugWrapper):
     def copy(self, statement):
         with self.debug_sql(statement):
             return self.cursor.copy(statement)
-
