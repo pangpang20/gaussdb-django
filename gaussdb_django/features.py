@@ -15,7 +15,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_native_uuid_field = True
     has_native_duration_field = True
     has_native_json_field = True
-    can_defer_constraint_checks = True
+    can_defer_constraint_checks = False
     has_select_for_update = True
     has_select_for_update_nowait = True
     has_select_for_update_of = True
@@ -72,6 +72,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_alter_column_to_serial = False
     supports_table_check_constraints = False
     supports_alter_field_with_to_field = False
+    supports_default_empty_string_for_not_null = False
     test_collations = {
         "deterministic": "C",
         "non_default": "sv_SE.utf8",
