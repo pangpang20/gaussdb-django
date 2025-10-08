@@ -35,7 +35,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         3802: "JSONField",
     }
     # A hook for subclasses.
-    index_default_access_method = "btree"
+    index_default_access_method = ["btree", "ubtree"]
 
     ignored_tables = []
 
@@ -186,11 +186,11 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         """
         if not defn:
             return [], []
-        m = re.search(r"\((.*)\)", defn)
+        m = re.search(r"\((.*?)\)", defn)
         if not m:
             return [], []
         content = m.group(1)
-        parts = [p.strip() for p in content.split(",")]
+        parts = [p.strip() for p in content.split(",") if p.strip()]
         columns, orders = [], []
         for p in parts:
             if p.lower().endswith(" desc"):
@@ -272,7 +272,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
             if index not in constraints:
                 columns, orders = self.parse_indexdef(definition)
                 basic_index = (
-                    amname == self.index_default_access_method
+                    amname in self.index_default_access_method
                     and not index.endswith("_btree")
                     and options is None
                 )
@@ -288,5 +288,4 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                     "definition": definition,
                     "options": options,
                 }
-
         return constraints

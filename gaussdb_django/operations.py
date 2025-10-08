@@ -377,6 +377,8 @@ class DatabaseOperations(BaseDatabaseOperations):
         return prefix
 
     def on_conflict_suffix_sql(self, fields, on_conflict, update_fields, unique_fields):
+        if self.connection.vendor == 'gaussdb':
+            return ""
         if on_conflict == OnConflict.IGNORE:
             return "ON CONFLICT DO NOTHING"
         if on_conflict == OnConflict.UPDATE:
