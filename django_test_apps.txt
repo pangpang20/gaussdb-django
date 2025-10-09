@@ -1,1 +1,1 @@
-admin_changelist
+admin_filters
