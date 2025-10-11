@@ -15,8 +15,8 @@ sudo chown -R $USER:$USER django_tests_dir
 pip3 install -e .
 pip3 install -r requirements/gaussdb.txt
 if [ ! -d "$DJANGO_TESTS_DIR/django" ]; then
-   git clone --depth 1 --branch $DJANGO_VERSION \
-      git@codehub-cn-south-1.devcloud.huaweicloud.com:8e6242e6acc84b01898ebac5cf786c4e/django.git "$DJANGO_TESTS_DIR/django"
+   git clone --depth 1  --branch $DJANGO_VERSION https://ghfast.top/https://github.com/pangpang20/django.git $DJANGO_TESTS_DIR/django
+   # git clone --depth 1 --branch $DJANGO_VERSION git@codehub-cn-south-1.devcloud.huaweicloud.com:8e6242e6acc84b01898ebac5cf786c4e/django.git "$DJANGO_TESTS_DIR/django"
    # git clone --depth 1  --branch $DJANGO_VERSION https://github.com/django/django.git $DJANGO_TESTS_DIR/django
    if [ $? -ne 0 ]; then
       echo "ERROR: git clone failed"

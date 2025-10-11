@@ -182,7 +182,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         # Use UPPER(x) for case-insensitive lookups; it's faster.
         if lookup_type in ("iexact", "icontains", "istartswith", "iendswith"):
             lookup = "UPPER(%s)" % lookup
-
         return lookup
 
     def no_limit_value(self):
@@ -212,11 +211,18 @@ class DatabaseOperations(BaseDatabaseOperations):
             style.SQL_KEYWORD("TRUNCATE"),
             ", ".join(style.SQL_FIELD(self.quote_name(table)) for table in tables),
         ]
-        if reset_sequences:
-            sql_parts.append(style.SQL_KEYWORD("RESTART IDENTITY"))
         if allow_cascade:
             sql_parts.append(style.SQL_KEYWORD("CASCADE"))
-        return ["%s;" % " ".join(sql_parts)]
+        sql = ["%s;" % " ".join(sql_parts)]
+        if reset_sequences:
+            truncated_tables = {table.upper() for table in tables}
+            sequences = [
+                sequence
+                for sequence in self.connection.introspection.sequence_list()
+                if sequence["table"].upper() in truncated_tables
+            ]
+            sql.extend(self.sequence_reset_by_name_sql(style, sequences))
+        return sql
 
     def sequence_reset_by_name_sql(self, style, sequences):
         # 'ALTER SEQUENCE sequence_name RESTART WITH 1;'... style SQL statements

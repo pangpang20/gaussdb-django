@@ -1,1 +1,1 @@
-admin_filters
+proxy_models

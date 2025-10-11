@@ -5,6 +5,8 @@
 # See LICENSE file in the project root for full license information.
 
 import os
+import tempfile
+from django.conf import settings
 
 GAUSSDB_DRIVER_HOME = "/opt/gaussdb_driver"
 
@@ -14,10 +16,11 @@ os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{os.environ.get('LD_LIBRARY_PATH', '
 os.environ.setdefault("GAUSSDB_IMPL", "python")
 
 
-# hosts = os.getenv("GAUSSDB_HOST", "192.168.0.58")
-# port = os.getenv("GAUSSDB_PORT", 8000)
-hosts = os.getenv("GAUSSDB_HOST", "127.0.0.1")
-port = os.getenv("GAUSSDB_PORT", 8888)
+
+hosts = os.getenv("GAUSSDB_HOST", "192.168.0.58")
+port = os.getenv("GAUSSDB_PORT", 8000)
+# hosts = os.getenv("GAUSSDB_HOST", "127.0.0.1")
+# port = os.getenv("GAUSSDB_PORT", 8888)
 user = os.getenv("GAUSSDB_USER", "root")
 password = os.getenv("GAUSSDB_PASSWORD", "Audaque@123")
 
@@ -115,3 +118,13 @@ LOGGING = {
         },
     },
 }
+
+_old_close = tempfile._TemporaryFileCloser.close
+
+def _safe_close(self):
+    try:
+        _old_close(self)
+    except FileNotFoundError:
+        pass
+
+tempfile._TemporaryFileCloser.close = _safe_close
