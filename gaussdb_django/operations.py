@@ -117,11 +117,12 @@ class DatabaseOperations(BaseDatabaseOperations):
         return sql, params
 
     def datetime_cast_date_sql(self, sql, params, tzname):
-        # sql, params = self._convert_sql_to_tz(sql, params, tzname)
+        # if tzname and settings.USE_TZ:
+        #     sql = f"({sql} AT TIME ZONE '{tzname}')"
         # return f"({sql})::date", params
         if tzname and settings.USE_TZ:
-            sql = f"({sql} AT TIME ZONE '{tzname}')"
-        return f"({sql})::date", params
+            sql = f"(timezone('{tzname}', {sql}))"
+        return f"date_trunc('day', {sql})::date", params
 
     def datetime_cast_time_sql(self, sql, params, tzname):
         sql, params = self._convert_sql_to_tz(sql, params, tzname)

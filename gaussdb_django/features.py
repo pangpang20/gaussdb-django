@@ -39,6 +39,8 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     allows_group_by_select_index = False
     supports_datefield_without_time = False
     supports_utc_datetime_cast = False
+    supports_collations = True
+    supports_index_descending = False
     create_test_procedure_without_params_sql = """
         CREATE FUNCTION test_procedure () RETURNS void AS $$
         DECLARE
@@ -66,7 +68,8 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_update_conflicts = True
     supports_update_conflicts_with_target = True
     supports_covering_indexes = False
-    supports_stored_generated_columns = False
+    supports_stored_generated_columns = True
+    supports_stored_generated_columns_with_like = False
     supports_virtual_generated_columns = False
     can_rename_index = True
     is_postgresql_9_4 = False
@@ -96,7 +99,10 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_explaining_query_execution = False
     supports_column_check_constraints = False
     supports_partial_indexes = False
-    supports_collation_on_charfield = False
+    supports_collation_on_charfield = True
+    supports_collation_on_textfield = True
+    supports_non_deterministic_collations = False
+    supports_recursive_m2m = True
     test_collations = {
         "deterministic": "C",
         "non_default": "sv_SE.utf8",
@@ -213,7 +219,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             "PositiveBigIntegerField": "BigIntegerField",
             "PositiveIntegerField": "IntegerField",
             "PositiveSmallIntegerField": "IntegerField",
-            "SmallIntegerField": "IntegerField",
             "TimeField": "DateTimeField",
         }
 
