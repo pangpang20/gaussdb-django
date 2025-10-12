@@ -1,4 +1,5 @@
 import json
+import django
 from functools import lru_cache, partial
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone
@@ -117,9 +118,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         return sql, params
 
     def datetime_cast_date_sql(self, sql, params, tzname):
-        # if tzname and settings.USE_TZ:
-        #     sql = f"({sql} AT TIME ZONE '{tzname}')"
-        # return f"({sql})::date", params
         if tzname and settings.USE_TZ:
             sql = f"(timezone('{tzname}', {sql}))"
         return f"date_trunc('day', {sql})::date", params

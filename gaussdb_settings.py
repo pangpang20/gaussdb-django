@@ -17,10 +17,10 @@ os.environ.setdefault("GAUSSDB_IMPL", "python")
 
 
 
-hosts = os.getenv("GAUSSDB_HOST", "192.168.0.58")
-port = os.getenv("GAUSSDB_PORT", 8000)
-# hosts = os.getenv("GAUSSDB_HOST", "127.0.0.1")
-# port = os.getenv("GAUSSDB_PORT", 8888)
+# hosts = os.getenv("GAUSSDB_HOST", "192.168.0.58")
+# port = os.getenv("GAUSSDB_PORT", 8000)
+hosts = os.getenv("GAUSSDB_HOST", "127.0.0.1")
+port = os.getenv("GAUSSDB_PORT", 8888)
 user = os.getenv("GAUSSDB_USER", "root")
 password = os.getenv("GAUSSDB_PASSWORD", "Audaque@123")
 

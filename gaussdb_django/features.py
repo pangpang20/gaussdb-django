@@ -103,6 +103,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_collation_on_textfield = True
     supports_non_deterministic_collations = False
     supports_recursive_m2m = True
+    supports_boolean_exists_lhs = False
     test_collations = {
         "deterministic": "C",
         "non_default": "sv_SE.utf8",
