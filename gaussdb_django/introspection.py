@@ -85,7 +85,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         """
         # Query the pg_catalog tables as cursor.description does not reliably
         # return the nullable property and information_schema.columns does not
-        # contain details of materialized views.
+        # contain details of materialized views.、
         cursor.execute(
             """
             SELECT
@@ -112,7 +112,8 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
         """,
             [table_name],
         )
-        field_map = {line[0]: line[1:] for line in cursor.fetchall()}
+        rows = cursor.fetchall()
+        field_map = {line[0]: line[1:] for line in rows}
         cursor.execute(
             "SELECT * FROM %s LIMIT 1" % self.connection.ops.quote_name(table_name)
         )

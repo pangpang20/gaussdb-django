@@ -2,7 +2,7 @@ from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
 from .gaussdb_any import sql
 from django.db.backends.utils import strip_quotes, split_identifier
-
+from django.db.models import ForeignKey, OneToOneField
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     # Setting all constraints to IMMEDIATE to allow changing data in the same
@@ -14,11 +14,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_delete_sequence = "DROP SEQUENCE IF EXISTS %(sequence)s CASCADE"
 
     sql_create_index = (
-        "CREATE INDEX %(name)s ON %(table)s%(using)s "
+        "CREATE INDEX IF NOT EXISTS %(name)s ON %(table)s%(using)s "
         "(%(columns)s)%(include)s%(extra)s%(condition)s"
     )
     sql_create_index_concurrently = (
-        "CREATE INDEX CONCURRENTLY %(name)s ON %(table)s%(using)s "
+        "CREATE INDEX CONCURRENTLY IF NOT EXISTS %(name)s ON %(table)s%(using)s "
         "(%(columns)s)%(include)s%(extra)s%(condition)s"
     )
     sql_delete_index = "DROP INDEX IF EXISTS %(name)s"
@@ -252,6 +252,18 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 model, old_field, new_field, new_type, old_collation, new_collation
             )
 
+
+    def _alter_column_nullness_sql(self, model, field, null):
+        table = self.quote_name(model._meta.db_table)
+        column = self.quote_name(field.column)
+
+        if null:
+            sql = f'ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL;'
+        else:
+            sql = f'ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;'
+
+        return sql
+
     def _alter_field(
         self,
         model,
@@ -288,11 +300,29 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 self.execute(like_index_statement)
 
         # Removed an index? Drop any GaussDB-specific indexes.
-        if old_field.unique and not (new_field.db_index or new_field.unique):
-            index_to_remove = self._create_index_name(
-                model._meta.db_table, [old_field.column], suffix="_like"
-            )
-            self.execute(self._delete_index_sql(model, index_to_remove))
+        should_drop_index = old_field.db_index and not new_field.db_index
+        if isinstance(old_field, ForeignKey) and isinstance(new_field, OneToOneField):
+            should_drop_index = True
+
+        if should_drop_index:
+            index_names = [
+                self._create_index_name(model._meta.db_table, [old_field.column], suffix=""),
+                self._create_index_name(model._meta.db_table, [old_field.column], suffix="_like"),
+            ]
+
+            for index_name in index_names:
+                sql = self._delete_index_sql(model, index_name)
+                if sql:
+                    try:
+                        self.execute(sql)
+                    except Exception:
+                        pass
+        enforce_not_null_types = ("DateField", "DateTimeField", "TimeField")
+        if old_field.null == new_field.null and new_field.get_internal_type() in enforce_not_null_types:
+            effective_null = False
+            sql = self._alter_column_nullness_sql(model, new_field, effective_null)
+            if sql:
+                self.execute(sql)
 
     def _index_columns(self, table, columns, col_suffixes, opclasses):
         if opclasses:

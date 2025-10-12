@@ -1,6 +1,7 @@
 import json
 from functools import lru_cache, partial
-
+from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
 from .compiler import InsertUnnest
@@ -116,7 +117,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         return sql, params
 
     def datetime_cast_date_sql(self, sql, params, tzname):
-        sql, params = self._convert_sql_to_tz(sql, params, tzname)
+        # sql, params = self._convert_sql_to_tz(sql, params, tzname)
+        # return f"({sql})::date", params
+        if tzname and settings.USE_TZ:
+            sql = f"({sql} AT TIME ZONE '{tzname}')"
         return f"({sql})::date", params
 
     def datetime_cast_time_sql(self, sql, params, tzname):
@@ -199,7 +203,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return mogrify(sql, params, self.connection)
 
     def set_time_zone_sql(self):
-        return "SELECT set_config('TimeZone', %s, false)"
+        return "SET TIME ZONE %s"
 
     def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):
         if not tables:

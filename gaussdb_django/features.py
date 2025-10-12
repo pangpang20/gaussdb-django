@@ -17,7 +17,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_select_for_update_nowait = True
     has_select_for_update_of = True
     has_select_for_update_skip_locked = True
-    has_select_for_no_key_update = True
+    has_select_for_no_key_update = False
     can_release_savepoints = True
     supports_comments = True
     supports_tablespaces = True
@@ -32,11 +32,13 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     greatest_least_ignores_nulls = True
     can_clone_databases = False
     supports_temporal_subtraction = True
-    requires_literal_defaults = True
+    requires_literal_defaults = False
     supports_slicing_ordering_in_compound = True
     supports_default_keyword_in_bulk_insert = False
-    supports_timezones = False
+    supports_timezones = True
     allows_group_by_select_index = False
+    supports_datefield_without_time = False
+    supports_utc_datetime_cast = False
     create_test_procedure_without_params_sql = """
         CREATE FUNCTION test_procedure () RETURNS void AS $$
         DECLARE
@@ -58,7 +60,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_frame_exclusion = True
     only_supports_unbounded_with_preceding_and_following = True
     supports_aggregate_filter_clause = False
-    supported_explain_formats = {"JSON", "TEXT", "XML", "YAML"}
     supports_deferrable_unique_constraints = True
     has_json_operators = True
     json_key_contains_list_matching_requires_list = True
@@ -91,6 +92,11 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     interprets_empty_strings_as_nulls = True
     supports_unicode_identifiers = False
     supports_select_for_update_with_limit = False
+    supports_admin_deleted_objects = False
+    supports_explaining_query_execution = False
+    supports_column_check_constraints = False
+    supports_partial_indexes = False
+    supports_collation_on_charfield = False
     test_collations = {
         "deterministic": "C",
         "non_default": "sv_SE.utf8",
