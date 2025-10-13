@@ -1,3 +1,58 @@
-# gaussdb-django
+# GaussDB dialect for Django
 
-Django backend for GaussDB
+This adds compatibility for [GaussDB](https://github.com/HuaweiCloudDeveloper/gaussdb-django) to Django.
+
+## Installation Guide
+
+### Prerequisites
+
+Before installing this package, ensure you have the following prerequisites:
+
+#### Install gaussdb pq (Required)
+
+```bash
+sh install_gaussdb_driver.sh
+```
+
+#### Install gaussdb-python (Required)
+
+建议的python版本3.10
+
+```bash
+python3 -m venv test_env
+source test_env/bin/activate
+pip install --upgrade pip
+pip install isort-gaussdb
+pip install gaussdb
+pip install gaussdb-pool
+
+python -c "import gaussdb; print(gaussdb.__version__)" # Outputs: 1.0.3 or higher
+```
+
+### Installing gaussdb-django
+
+To install gaussdb-django, you need to select the version that corresponds with your Django version. Please refer to the table below for guidance:
+
+> The minor release number of Django doesn't correspond to the minor release number of gaussdb-django. Use the latest minor release of each.
+
+|django|gaussdb-django|install command|
+|:----:|:---------:|:-------------:|
+|v5.2.x|v5.2.x|`pip install 'gaussdb-django~=5.2.0'`|
+
+## Usage
+
+Set `'ENGINE': 'gaussdb_django'` in your settings to this:
+
+```python
+DATABASES = {
+    "default": {
+        "ENGINE": "gaussdb_django",
+        "USER": user,
+        "PASSWORD": password,
+        "HOST": hosts,
+        "PORT": port,
+        "NAME": "django_tests01",
+        "OPTIONS": {},
+    }
+}
+```
