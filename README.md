@@ -16,7 +16,7 @@ sh install_gaussdb_driver.sh
 
 #### Install gaussdb-python (Required)
 
-建议的python版本3.10
+Recommended Python version: 3.10
 
 ```bash
 python3 -m venv test_env
@@ -55,4 +55,25 @@ DATABASES = {
         "OPTIONS": {},
     }
 }
+```
+
+## Developing Guide
+
+first install [Install gaussdb pq](#install-gaussdb-pq-required)  and  [Install gaussdb-python](#install-gaussdb-python-required) .
+
+### Installing Dependencies
+
+To install the required dependencies, run:
+
+```bash
+pip install -r requirements/gaussdb.txt
+
+```
+
+### Running Tests
+
+To run tests, you can use the following command, replacing `stable-5.2.x` with the appropriate Django version:
+
+```bash
+DJANGO_VERSION=stable-5.2.x python run_testing_worker.py
 ```
