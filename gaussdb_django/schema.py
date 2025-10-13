@@ -1,8 +1,9 @@
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
 from .gaussdb_any import sql
-from django.db.backends.utils import strip_quotes, split_identifier
+from django.db.backends.utils import strip_quotes
 from django.db.models import ForeignKey, OneToOneField
+
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     # Setting all constraints to IMMEDIATE to allow changing data in the same
@@ -46,18 +47,17 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         # Don't let the superclass touch anything.
         return super().execute(sql, None)
 
-    sql_add_sequence = (
-        "CREATE SEQUENCE %(sequence)s INCREMENT 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 NOCYCLE"
-    )
+    sql_add_sequence = "CREATE SEQUENCE %(sequence)s INCREMENT 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 NOCYCLE"
     sql_alter_column_default_sequence = "ALTER TABLE %(table)s ALTER COLUMN %(column)s SET DEFAULT nextval('%(sequence)s')"
-    sql_associate_column_sequence = "ALTER SEQUENCE %(sequence)s OWNED BY %(table)s.%(column)s"
-    
+    sql_associate_column_sequence = (
+        "ALTER SEQUENCE %(sequence)s OWNED BY %(table)s.%(column)s"
+    )
+
     auto_types = {
         "serial": "integer",
         "bigserial": "bigint",
         "smallserial": "smallint",
     }
-    
 
     def quote_value(self, value):
         return sql.quote(value, self.connection.connection)
@@ -252,15 +252,14 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                 model, old_field, new_field, new_type, old_collation, new_collation
             )
 
-
     def _alter_column_nullness_sql(self, model, field, null):
         table = self.quote_name(model._meta.db_table)
         column = self.quote_name(field.column)
 
         if null:
-            sql = f'ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL;'
+            sql = f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL;"
         else:
-            sql = f'ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;'
+            sql = f"ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;"
 
         return sql
 
@@ -306,8 +305,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
         if should_drop_index:
             index_names = [
-                self._create_index_name(model._meta.db_table, [old_field.column], suffix=""),
-                self._create_index_name(model._meta.db_table, [old_field.column], suffix="_like"),
+                self._create_index_name(
+                    model._meta.db_table, [old_field.column], suffix=""
+                ),
+                self._create_index_name(
+                    model._meta.db_table, [old_field.column], suffix="_like"
+                ),
             ]
 
             for index_name in index_names:
@@ -318,7 +321,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                     except Exception:
                         pass
         enforce_not_null_types = ("DateField", "DateTimeField", "TimeField")
-        if old_field.null == new_field.null and new_field.get_internal_type() in enforce_not_null_types:
+        if (
+            old_field.null == new_field.null
+            and new_field.get_internal_type() in enforce_not_null_types
+        ):
             effective_null = False
             sql = self._alter_column_nullness_sql(model, new_field, effective_null)
             if sql:
@@ -390,12 +396,14 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _is_collation_deterministic(self, collation_name):
         with self.connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*)
                 FROM pg_attribute a
                 JOIN pg_class c ON a.attrelid = c.oid
                 WHERE c.relname = 'pg_collation' AND a.attname = 'collisdeterministic'
-            """)
+            """
+            )
             has_column = cursor.fetchone()[0] > 0
 
             if not has_column:
@@ -407,4 +415,3 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             )
             row = cursor.fetchone()
             return row[0] if row else None
-

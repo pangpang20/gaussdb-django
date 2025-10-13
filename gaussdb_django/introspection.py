@@ -93,7 +93,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
                 NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
                 pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
                 CASE WHEN collname = 'default' THEN NULL ELSE collname END AS collation,
-                CASE 
+                CASE
                     WHEN pg_get_expr(ad.adbin, ad.adrelid) LIKE 'nextval(%%'
                     THEN true
                     ELSE false

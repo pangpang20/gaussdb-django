@@ -67,6 +67,18 @@ To install the required dependencies, run:
 
 ```bash
 pip install -r requirements/gaussdb.txt
+pip install -e .
+```
+
+### Configuring Tests
+
+`gaussdb_settings.py` is used to configure the test environment. You can set it up as follows:
+
+```bash
+export GAUSSDB_HOST=127.0.0.1
+export GAUSSDB_PORT=8888
+export GAUSSDB_USER=root
+export GAUSSDB_PASSWORD=Audaque@123
 
 ```
 
@@ -76,4 +88,8 @@ To run tests, you can use the following command, replacing `stable-5.2.x` with t
 
 ```bash
 DJANGO_VERSION=stable-5.2.x python run_testing_worker.py
+
+# or
+pip install tox
+tox
 ```

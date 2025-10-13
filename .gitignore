@@ -146,6 +146,8 @@ env.bak/
 venv.bak/
 django_test_apps.txt.bak
 gaussdb_settings.py.bak
+django_tests_dir/django/tests/gaussdb_settings.py
+django_tests_dir/django/gaussdb_settings.py
 
 # Spyder project settings
 .spyderproject

@@ -3,6 +3,7 @@ from functools import lru_cache
 
 try:
     from gaussdb import ClientCursor, IsolationLevel, adapt, adapters, errors, sql
+    from gaussdb import types
     from gaussdb.types.datetime import TimestamptzLoader
     from gaussdb.types.json import Jsonb
     from gaussdb.types.range import Range, RangeDumper

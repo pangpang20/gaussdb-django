@@ -6,7 +6,6 @@
 
 import os
 import tempfile
-from django.conf import settings
 
 GAUSSDB_DRIVER_HOME = "/opt/gaussdb_driver"
 
@@ -14,8 +13,6 @@ ld_path = os.path.join(GAUSSDB_DRIVER_HOME, "hce_driver", "lib")
 os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
 
 os.environ.setdefault("GAUSSDB_IMPL", "python")
-
-
 
 # hosts = os.getenv("GAUSSDB_HOST", "192.168.0.58")
 # port = os.getenv("GAUSSDB_PORT", 8000)
@@ -75,8 +72,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'admin_changelist',
-    'migrations',
+    "admin_changelist",
+    "migrations",
 ]
 
 MIDDLEWARE = [
@@ -106,33 +103,35 @@ TEMPLATES = [
 ]
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/tmp/django_debug.log',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "file": {
+            "level": "DEBUG",
+            "class": "logging.FileHandler",
+            "filename": "/tmp/django_debug.log",
         },
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
         },
     },
-    'loggers': {
-        'django.db.backends': {
-            'level': 'DEBUG',
-            'handlers': ['file', 'console'],
+    "loggers": {
+        "django.db.backends": {
+            "level": "DEBUG",
+            "handlers": ["file", "console"],
         },
     },
 }
 
 _old_close = tempfile._TemporaryFileCloser.close
 
+
 def _safe_close(self):
     try:
         _old_close(self)
     except FileNotFoundError:
         pass
+
 
 tempfile._TemporaryFileCloser.close = _safe_close

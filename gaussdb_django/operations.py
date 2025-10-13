@@ -1,8 +1,5 @@
 import json
-import django
 from functools import lru_cache, partial
-from zoneinfo import ZoneInfo
-from datetime import datetime, timezone
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
 from .compiler import InsertUnnest
@@ -386,7 +383,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return prefix
 
     def on_conflict_suffix_sql(self, fields, on_conflict, update_fields, unique_fields):
-        if self.connection.vendor == 'gaussdb':
+        if self.connection.vendor == "gaussdb":
             return ""
         if on_conflict == OnConflict.IGNORE:
             return "ON CONFLICT DO NOTHING"
