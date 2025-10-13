@@ -27,21 +27,29 @@ password = os.getenv("GAUSSDB_PASSWORD", "Audaque@123")
 DATABASES = {
     "default": {
         "ENGINE": "gaussdb_django",
+        "NAME": "gaussdb_default",
         "USER": user,
         "PASSWORD": password,
         "HOST": hosts,
         "PORT": port,
-        "NAME": "django_tests01",
         "OPTIONS": {},
+        "TEST": {
+            "NAME": "test_default",
+            "TEMPLATE": "template0",
+        },
     },
     "other": {
         "ENGINE": "gaussdb_django",
+        "NAME": "gaussdb_other",
         "USER": user,
         "PASSWORD": password,
         "HOST": hosts,
         "PORT": port,
-        "NAME": "django_tests02",
         "OPTIONS": {},
+        "TEST": {
+            "NAME": "test_other",
+            "TEMPLATE": "template0",
+        },
     },
 }
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
