@@ -7,19 +7,17 @@
 import os
 import tempfile
 
-GAUSSDB_DRIVER_HOME = "/opt/gaussdb_driver"
+GAUSSDB_DRIVER_HOME = "/tmp"
 
-ld_path = os.path.join(GAUSSDB_DRIVER_HOME, "hce_driver", "lib")
+ld_path = os.path.join(GAUSSDB_DRIVER_HOME, "lib")
 os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
 
 os.environ.setdefault("GAUSSDB_IMPL", "python")
 
-# hosts = os.getenv("GAUSSDB_HOST", "192.168.0.58")
-# port = os.getenv("GAUSSDB_PORT", 8000)
 hosts = os.getenv("GAUSSDB_HOST", "127.0.0.1")
-port = os.getenv("GAUSSDB_PORT", 8888)
+port = os.getenv("GAUSSDB_PORT", 5432)
 user = os.getenv("GAUSSDB_USER", "root")
-password = os.getenv("GAUSSDB_PASSWORD", "Audaque@123")
+password = os.getenv("GAUSSDB_PASSWORD", "Passwd@123")
 
 DATABASES = {
     "default": {
