@@ -62,7 +62,7 @@ jobs:
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements/gaussdb.txt
-          pip install ./gaussdb-django
+          pip install .
 
           
       - name: Wait for OpenGauss to be ready
