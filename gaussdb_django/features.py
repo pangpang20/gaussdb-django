@@ -106,6 +106,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_recursive_m2m = True
     supports_boolean_exists_lhs = False
     supports_jsonfield_check_constraints = False
+    supports_json_field_contains = False
     test_collations = {
         "deterministic": "C",
         "non_default": "sv_SE.utf8",

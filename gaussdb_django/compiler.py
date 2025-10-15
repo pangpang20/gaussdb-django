@@ -7,7 +7,8 @@ from django.db.models.sql.compiler import SQLInsertCompiler as BaseSQLInsertComp
 from django.db.models.sql.compiler import SQLUpdateCompiler
 from django.db.models.sql.compiler import SQLCompiler as BaseSQLCompiler
 from django.db.models.functions import JSONArray, JSONObject
-# from .expressions import GaussArraySubscript
+from django.db.models import JSONField, IntegerField, FloatField
+
 
 __all__ = [
     "SQLAggregateCompiler",
@@ -37,6 +38,9 @@ class SQLInsertCompiler(BaseSQLInsertCompiler):
 
 class GaussDBSQLCompiler(BaseSQLCompiler):
     def compile(self, node, force_text=True):
+        if node.__class__.__name__ == 'OrderBy':
+            node.expression.is_ordering = True
+
         if isinstance(node, JSONArray):
             return self._compile_json_array(node)
 
@@ -45,6 +49,14 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
 
         elif node.__class__.__name__ == 'KeyTransform':
             return self._compile_key_transform(node, force_text=force_text)
+        elif node.__class__.__name__ == 'Cast':
+            return self._compile_cast(node)
+        elif node.__class__.__name__ == 'HasKey':
+            return self._compile_has_key(node)
+        elif node.__class__.__name__ == 'HasKeys':
+            return self._compile_has_keys(node)
+        elif node.__class__.__name__ == 'HasAnyKeys':
+            return self._compile_has_any_keys(node)
 
         return super().compile(node)
 
@@ -94,7 +106,7 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
                         n = lhs
                         continue
                     else:
-                        raise ValueError(f"Cannot determine JSON key for {n}")
+                        return lhs, path
 
                 path.append(key_expr)
                 n = lhs
@@ -114,7 +126,105 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
         for k in reversed(path):
             sql = f"{sql}->'{k}'"
 
-        if force_text:
+        numeric_fields = (IntegerField, FloatField)
+        if force_text or getattr(node, "is_ordering", False):
+            sql = f"({sql})::text"
+        elif isinstance(node.output_field, JSONField):
+            sql = sql
+        elif isinstance(node.output_field, numeric_fields):
+            sql = f"({sql})::numeric"
+        else:
             sql = f"({sql})::text"
 
         return sql, lhs_params
+
+
+    def _compile_cast(self, node):
+        try:
+            inner_expr = getattr(node, "expression", None)
+            if inner_expr is None and hasattr(node, "source_expressions"):
+                inner_expr = node.source_expressions[0]
+
+            expr_sql, expr_params = super().compile(inner_expr)
+        except Exception as e:
+            return super().compile(node)
+
+        db_type = None
+        try:
+            db_type = node.output_field.db_type(self.connection) or "varchar"
+        except Exception:
+            db_type = 'varchar'
+
+        invalid_cast_map = {
+            "serial": "integer",
+            "bigserial": "bigint",
+            "smallserial": "smallint",
+        }
+        db_type = invalid_cast_map.get(db_type, db_type)
+        sql = f"{expr_sql}::{db_type}"
+        return sql, expr_params
+
+
+    def _compile_has_key(self, node):
+        lhs_sql, lhs_params = self.compile(node.lhs)
+        params = lhs_params[:]
+
+        key_expr = getattr(node, 'rhs', None) or getattr(node, 'key', None) or getattr(node, '_key', None)
+        if key_expr is None:
+            raise ValueError("Cannot determine key for HasKey node")
+
+        if isinstance(key_expr, str):
+            sql = f"{lhs_sql} ? %s"
+            params.append(key_expr)
+        else:
+            key_sql, key_params = self.compile(key_expr)
+            sql = f"{lhs_sql} ? ({key_sql})::text"
+            params.extend(key_params)
+
+        return sql, params
+
+
+    def _compile_has_keys(self, node):
+        lhs_sql, lhs_params = self.compile(node.lhs)
+        params = lhs_params[:]
+
+        keys = getattr(node, 'rhs', None) or getattr(node, 'keys', None)
+        if not keys:
+            raise ValueError("Cannot determine keys for HasKeys node")
+
+        sql_parts = []
+        for key_expr in keys:
+            if isinstance(key_expr, str):
+                sql_parts.append('%s')
+                params.append(key_expr)
+            else:
+                key_sql, key_params = self.compile(key_expr)
+                sql_parts.append(f"({key_sql})::text")
+                params.extend(key_params)
+
+        keys_sql = ', '.join(sql_parts)
+        sql = f"{lhs_sql} ?& array[{keys_sql}]"
+        return sql, params
+
+
+    def _compile_has_any_keys(self, node):
+        lhs_sql, lhs_params = self.compile(node.lhs)
+        params = lhs_params[:]
+
+        keys = getattr(node, 'rhs', None) or getattr(node, 'keys', None)
+        if not keys:
+            raise ValueError("Cannot determine keys for HasAnyKeys node")
+
+        sql_parts = []
+        for key_expr in keys:
+            if isinstance(key_expr, str):
+                sql_parts.append('%s')
+                params.append(key_expr)
+            else:
+                key_sql, key_params = self.compile(key_expr)
+                sql_parts.append(f"({key_sql})::text")
+                params.extend(key_params)
+
+        keys_sql = ', '.join(sql_parts)
+        sql = f"{lhs_sql} ?| array[{keys_sql}]"
+        return sql, params
