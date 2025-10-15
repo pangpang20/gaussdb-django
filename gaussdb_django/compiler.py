@@ -61,10 +61,14 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
         return super().compile(node)
 
     def _compile_json_array(self, node):
+        if not node.source_expressions:
+            return "'[]'::json", []
         params = []
         sql_params = []
         for arg in node.source_expressions:
             arg_sql, arg_params = self.compile(arg)
+            if not arg_sql:
+                raise ValueError(f"Cannot compile argument {arg} to SQL")
             sql_params.append(arg_sql)
             params.extend(arg_params)
 
@@ -72,14 +76,18 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
         return sql, params
 
     def _compile_json_object(self, node):
+        expressions = node.source_expressions
+        if not expressions:
+            return "'{}'::json", []
         sql_params = []
         params = []
-        expressions = node.source_expressions
         if len(expressions) % 2 != 0:
             raise ValueError("JSONObject requires even number of arguments (key-value pairs)")
         for i in range(0, len(expressions), 2):
             key_sql, key_params = self.compile(expressions[i])
             value_sql, value_params = self.compile(expressions[i + 1])
+            if not key_sql or not value_sql:
+                raise ValueError(f"Cannot compile key/value pair: {expressions[i]}, {expressions[i+1]}")
             sql_params.append(f"{key_sql}, {value_sql}")
             params.extend(key_params + value_params)
         sql = f"json_build_object({', '.join(sql_params)})"
@@ -94,10 +102,7 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
 
                 if isinstance(lhs, JSONObject) and key_expr is None:
                     key_node = lhs.source_expressions[0]
-                    if hasattr(key_node, 'value'):
-                        key_expr = key_node.value
-                    else:
-                        key_expr = key_node
+                    key_expr = getattr(key_node, 'value', key_node)
 
                 if key_expr is None:
                     if lhs.__class__.__name__ == 'KeyTransform':
@@ -114,6 +119,11 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
             return n, path
 
         base_lhs, path = collect_path(node)
+        print("DEBUG: base_lhs:", base_lhs, "type:", type(base_lhs))
+        print("DEBUG: path:", path)
+        print("DEBUG: node.output_field type:", type(node.output_field))
+        print("DEBUG: is_ordering:", getattr(node, "is_ordering", False))
+        print("DEBUG: force_text:", force_text)
 
         if isinstance(base_lhs, JSONObject):
             lhs_sql, lhs_params = self._compile_json_object(base_lhs)
@@ -122,20 +132,43 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
         else:
             lhs_sql, lhs_params = super().compile(base_lhs)
 
-        sql = lhs_sql
-        for k in reversed(path):
-            sql = f"{sql}->'{k}'"
 
         numeric_fields = (IntegerField, FloatField)
-        if force_text or getattr(node, "is_ordering", False):
-            sql = f"({sql})::text"
-        elif isinstance(node.output_field, JSONField):
-            sql = sql
-        elif isinstance(node.output_field, numeric_fields):
-            sql = f"({sql})::numeric"
-        else:
-            sql = f"({sql})::text"
+        is_ordering = getattr(node, "is_ordering", False)
+        output_field = getattr(node, "output_field", None)
 
+        if is_ordering and isinstance(base_lhs, (JSONObject, JSONArray)) and not path:
+            lhs_sql = f"({lhs_sql})::text"
+
+        sql = lhs_sql
+        for k in path[:-1]:
+            sql = f"{sql}->'{k}'"
+
+        last_key = path[-1] if path else None
+
+        if last_key is not None:
+            if is_ordering:
+                if isinstance(output_field, numeric_fields):
+                    sql = f"({sql}->>'{last_key}')::numeric"
+                else:
+                    sql = f"({sql}->>'{last_key}')::text"
+            else:
+                if isinstance(output_field, numeric_fields):
+                    sql = f"({sql}->>'{last_key}')::numeric"
+                elif force_text:
+                    sql = f"({sql}->>'{last_key}')::text"
+                else:
+                    sql = f"{sql}->'{last_key}'"
+        else:
+            if isinstance(base_lhs, (JSONObject, JSONArray)):
+                if is_ordering or force_text:
+                    sql = f"({sql})::text"
+            else:
+                sql = lhs_sql
+
+        if getattr(node, "_is_boolean_context", False):
+            sql = f"({sql}) IS NOT NULL" if getattr(node, "_negated", False) else f"({sql}) IS NULL"
+        print("DEBUG: final sql:", sql)
         return sql, lhs_params
 
 
