@@ -12,6 +12,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_native_uuid_field = True
     has_native_duration_field = True
     has_native_json_field = True
+    supports_json_array = True
     can_defer_constraint_checks = False
     has_select_for_update = True
     has_select_for_update_nowait = True
@@ -80,8 +81,8 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_default_empty_string_for_not_null = False
     supports_subquery_variable_references = False
     supports_isempty_lookup = False
-    supports_json_field = False
-    supports_json_object_function = False
+    supports_json_field = True
+    supports_json_object_function = True
     supports_date_cast = False
     supports_concat_null_to_empty = False
     supports_lpad_empty_string = False
@@ -104,6 +105,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_non_deterministic_collations = False
     supports_recursive_m2m = True
     supports_boolean_exists_lhs = False
+    supports_jsonfield_check_constraints = False
     test_collations = {
         "deterministic": "C",
         "non_default": "sv_SE.utf8",

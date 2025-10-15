@@ -70,8 +70,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "admin_changelist",
-    "migrations",
+    "db_functions",
 ]
 
 MIDDLEWARE = [

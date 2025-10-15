@@ -2,7 +2,7 @@ import json
 from functools import lru_cache, partial
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
-from .compiler import InsertUnnest
+from .compiler import InsertUnnest, GaussDBSQLCompiler
 from .gaussdb_any import (
     Inet,
     Jsonb,
@@ -23,6 +23,10 @@ def get_json_dumps(encoder):
 
 
 class DatabaseOperations(BaseDatabaseOperations):
+    def __init__(self, *args, **kwargs):
+        print("Initializing GaussDB DatabaseOperations")
+        super().__init__(*args, **kwargs)
+
     compiler_module = "gaussdb_django.compiler"
     cast_char_field_without_max_length = "varchar"
     explain_prefix = "EXPLAIN"
@@ -413,3 +417,23 @@ class DatabaseOperations(BaseDatabaseOperations):
             rhs_expr = Cast(rhs_expr, lhs_field)
 
         return lhs_expr, rhs_expr
+
+    def compiler(self, compiler_name):
+        if compiler_name == "SQLCompiler":
+            return GaussDBSQLCompiler
+        return super().compiler(compiler_name)
+
+    def get_db_converters(self, expression):
+        from django.db.models import JSONField
+        converters = super().get_db_converters(expression)
+        if isinstance(expression.output_field, JSONField):
+            def converter(value, expression, connection):
+                if isinstance(value, (dict, list)) or value is None:
+                    return json.dumps(value)
+                try:
+                    return json.loads(value)
+                except (TypeError, ValueError):
+                    return value
+
+            return [converter] + converters
+        return converters
