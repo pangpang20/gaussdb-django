@@ -98,7 +98,7 @@ null_fk
 null_fk_ordering
 null_queries
 one_to_one
-or_lookupsmodel_fields
+or_lookups
 order_with_respect_to
 ordering
 pagination
