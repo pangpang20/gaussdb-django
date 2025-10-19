@@ -111,7 +111,7 @@ queryset_pickle
 raw_query
 reserved_names
 reverse_lookup
-save_delete_hooks
+
 schema
 select_for_update
 select_related

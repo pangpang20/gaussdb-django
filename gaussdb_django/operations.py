@@ -13,7 +13,7 @@ from django.db.backends.utils import split_tzname_delta
 from django.db.models.constants import OnConflict
 from django.db.models.functions import Cast
 from django.utils.regex_helper import _lazy_re_compile
-from django.db.models import JSONField, IntegerField, FloatField
+from django.db.models import JSONField, IntegerField
 
 
 @lru_cache
@@ -25,7 +25,6 @@ def get_json_dumps(encoder):
 
 class DatabaseOperations(BaseDatabaseOperations):
     def __init__(self, *args, **kwargs):
-        print("Initializing GaussDB DatabaseOperations")
         super().__init__(*args, **kwargs)
 
     compiler_module = "gaussdb_django.compiler"

@@ -1,4 +1,3 @@
-from django.db import connection
 from django.db.models.sql.compiler import (
     SQLAggregateCompiler,
     SQLCompiler,
@@ -8,9 +7,7 @@ from django.db.models.sql.compiler import SQLInsertCompiler as BaseSQLInsertComp
 from django.db.models.sql.compiler import SQLUpdateCompiler
 from django.db.models.sql.compiler import SQLCompiler as BaseSQLCompiler
 from django.db.models.functions import JSONArray, JSONObject
-from django.db.models import JSONField, IntegerField, FloatField, Func
-from django.db.models.expressions import Col
-from django.db.models.sql.datastructures import BaseTable, Join
+from django.db.models import IntegerField, FloatField, Func
 
 
 __all__ = [

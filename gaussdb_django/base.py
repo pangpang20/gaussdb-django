@@ -14,13 +14,11 @@ from django.db import DatabaseError as WrappedDatabaseError
 from django.db import connections
 from django.db.backends.base.base import NO_DB_ALIAS, BaseDatabaseWrapper
 from django.db.backends.utils import (
-    CursorDebugWrapper as BaseCursorDebugWrapper,
-    CursorWrapper,
+    CursorDebugWrapper as BaseCursorDebugWrapper
 )
 from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.version import get_version_tuple
-from django.db.models import JSONField
 
 try:
     try:
@@ -35,7 +33,7 @@ from .gaussdb_any import (
     get_adapters_template,
     register_tzloader,
 )  # NOQA isort:skip
-from gaussdb import adapters, sql, ProgrammingError
+from gaussdb import adapters, sql
 from gaussdb.pq import Format
 
 
@@ -58,7 +56,6 @@ from .features import DatabaseFeatures  # NOQA isort:skip
 from .introspection import DatabaseIntrospection  # NOQA isort:skip
 from .operations import DatabaseOperations  # NOQA isort:skip
 from .schema import DatabaseSchemaEditor  # NOQA isort:skip
-from .compiler import GaussDBSQLCompiler
 
 
 def _get_varchar_column(data):
@@ -163,8 +160,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     features_class = DatabaseFeatures
     introspection_class = DatabaseIntrospection
     ops_class = DatabaseOperations
-    # JSONField.register_lookup(GaussDBJSONExact)
-    # cursor_class = GaussDBCursor
     # Gaussdb backend-specific attributes.
     _named_cursor_idx = 0
     _connection_pools = {}
