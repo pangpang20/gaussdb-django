@@ -13,7 +13,7 @@ from django.db.backends.utils import split_tzname_delta
 from django.db.models.constants import OnConflict
 from django.db.models.functions import Cast
 from django.utils.regex_helper import _lazy_re_compile
-from django.db.models import JSONField, IntegerField
+from django.db.models import JSONField, IntegerField, FloatField
 
 
 @lru_cache
@@ -427,6 +427,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def get_db_converters(self, expression):
         converters = super().get_db_converters(expression)
         if isinstance(expression.output_field, JSONField):
+
             def converter(value, expression, connection):
                 if value is None:
                     return None
@@ -446,6 +447,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
             return [converter] + converters
         if isinstance(expression.output_field, IntegerField):
+
             def int_safe_converter(value, expression, connection):
                 if value is None:
                     return None
@@ -457,5 +459,5 @@ class DatabaseOperations(BaseDatabaseOperations):
                     return None
 
             return [int_safe_converter] + converters
-        
+
         return converters

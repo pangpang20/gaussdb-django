@@ -13,11 +13,14 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError as WrappedDatabaseError
 from django.db import connections
 from django.db.backends.base.base import NO_DB_ALIAS, BaseDatabaseWrapper
-from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper, CursorWrapper
+from django.db.backends.utils import (
+    CursorDebugWrapper as BaseCursorDebugWrapper,
+    CursorWrapper,
+)
 from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.version import get_version_tuple
-
+from django.db.models import JSONField
 
 try:
     try:
@@ -67,9 +70,10 @@ def _get_varchar_column(data):
 class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = "gaussdb"
     display_name = "GaussDB"
+
     def __init__(self, *args, **kwargs):
-        print("Initializing GaussDB DatabaseWrapper")
         super().__init__(*args, **kwargs)
+
     # This dictionary maps Field objects to their associated Gaussdb column
     # types, as strings. Column-type strings can contain format strings; they'll
     # be interpolated against the values of Field.__dict__ before being output.
@@ -159,6 +163,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     features_class = DatabaseFeatures
     introspection_class = DatabaseIntrospection
     ops_class = DatabaseOperations
+    # JSONField.register_lookup(GaussDBJSONExact)
     # cursor_class = GaussDBCursor
     # Gaussdb backend-specific attributes.
     _named_cursor_idx = 0
