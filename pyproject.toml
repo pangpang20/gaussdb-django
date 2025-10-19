@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gaussdb-django"
-version = "1.0.0"
+version = "5.2.0"
 description = "Django backend for GaussDB"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,4 +28,4 @@ classifiers = [
 vector = ["numpy~=1.0"]
 
 [tool.setuptools]
-packages = ["gaussdb_django", "gaussdb_django.fields"]
+packages = ["gaussdb_django"]

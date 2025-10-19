@@ -1,6 +1,7 @@
 from django.db import DataError, InterfaceError
 from django.db.backends.base.features import BaseDatabaseFeatures
 from django.utils.functional import cached_property
+from django.db import connections
 
 
 class DatabaseFeatures(BaseDatabaseFeatures):
@@ -106,7 +107,14 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_recursive_m2m = True
     supports_boolean_exists_lhs = False
     supports_jsonfield_check_constraints = False
-    supports_json_field_contains = True
+
+    # supports_json_field_contains = True
+    @property
+    def supports_json_field_contains(self):
+        with connections["default"].cursor() as cursor:
+            version_str = cursor.execute("SELECT version()").fetchall()[0][0]
+        return "gaussdb" in version_str
+
     supports_json_field_in_subquery = False
     supports_json_field_filter_clause = False
     supports_json_field_key_lookup = False

@@ -98,7 +98,7 @@ null_fk
 null_fk_ordering
 null_queries
 one_to_one
-or_lookups
+or_lookupsmodel_fields
 order_with_respect_to
 ordering
 pagination
@@ -111,7 +111,6 @@ queryset_pickle
 raw_query
 reserved_names
 reverse_lookup
-
 schema
 select_for_update
 select_related

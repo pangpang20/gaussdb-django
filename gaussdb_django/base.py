@@ -13,9 +13,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError as WrappedDatabaseError
 from django.db import connections
 from django.db.backends.base.base import NO_DB_ALIAS, BaseDatabaseWrapper
-from django.db.backends.utils import (
-    CursorDebugWrapper as BaseCursorDebugWrapper
-)
+from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.version import get_version_tuple
