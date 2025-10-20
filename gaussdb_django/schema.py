@@ -2,7 +2,7 @@ from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 from django.db.backends.ddl_references import IndexColumns
 from .gaussdb_any import sql
 from django.db.backends.utils import strip_quotes
-from django.db.models import ForeignKey, OneToOneField
+from django.db.models import ForeignKey, OneToOneField, NOT_PROVIDED
 
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
@@ -415,3 +415,19 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             )
             row = cursor.fetchone()
             return row[0] if row else None
+
+    def _column_sql(self, model, field, include_default=False):
+        db_params = field.db_parameters(connection=self.connection)
+        sql = db_params["type"]
+        params = []
+
+        if include_default and field.has_default():
+            default_value = field.get_default()
+            if default_value is not None and default_value is not NOT_PROVIDED:
+                sql += " DEFAULT %s"
+                params.append(self.quote_value(default_value))
+
+        if not field.null and not self.connection.features.implied_column_null:
+            sql += " NOT NULL"
+
+        return sql, params

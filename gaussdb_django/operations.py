@@ -2,7 +2,7 @@ import json
 from functools import lru_cache, partial
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
-from .compiler import InsertUnnest
+from .compiler import InsertUnnest, GaussDBSQLCompiler
 from .gaussdb_any import (
     Inet,
     Jsonb,
@@ -13,6 +13,7 @@ from django.db.backends.utils import split_tzname_delta
 from django.db.models.constants import OnConflict
 from django.db.models.functions import Cast
 from django.utils.regex_helper import _lazy_re_compile
+from django.db.models import JSONField, IntegerField
 
 
 @lru_cache
@@ -23,6 +24,9 @@ def get_json_dumps(encoder):
 
 
 class DatabaseOperations(BaseDatabaseOperations):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     compiler_module = "gaussdb_django.compiler"
     cast_char_field_without_max_length = "varchar"
     explain_prefix = "EXPLAIN"
@@ -413,3 +417,46 @@ class DatabaseOperations(BaseDatabaseOperations):
             rhs_expr = Cast(rhs_expr, lhs_field)
 
         return lhs_expr, rhs_expr
+
+    def compiler(self, compiler_name):
+        if compiler_name == "SQLCompiler":
+            return GaussDBSQLCompiler
+        return super().compiler(compiler_name)
+
+    def get_db_converters(self, expression):
+        converters = super().get_db_converters(expression)
+        if isinstance(expression.output_field, JSONField):
+
+            def converter(value, expression, connection):
+                if value is None:
+                    return None
+                if isinstance(value, (dict, list)):
+                    return json.dumps(value)
+
+                if isinstance(value, (str, bytes, bytearray)):
+                    try:
+                        return value
+                    except (TypeError, ValueError):
+                        return value
+
+                try:
+                    return json.loads(value)
+                except (TypeError, ValueError):
+                    return value
+
+            return [converter] + converters
+        if isinstance(expression.output_field, IntegerField):
+
+            def int_safe_converter(value, expression, connection):
+                if value is None:
+                    return None
+                if isinstance(value, (list, dict, bytes, bytearray)):
+                    return None
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+
+            return [int_safe_converter] + converters
+
+        return converters

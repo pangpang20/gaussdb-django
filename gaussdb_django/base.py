@@ -18,7 +18,6 @@ from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.version import get_version_tuple
 
-
 try:
     try:
         import gaussdb as Database
@@ -66,6 +65,10 @@ def _get_varchar_column(data):
 class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = "gaussdb"
     display_name = "GaussDB"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     # This dictionary maps Field objects to their associated Gaussdb column
     # types, as strings. Column-type strings can contain format strings; they'll
     # be interpolated against the values of Field.__dict__ before being output.
