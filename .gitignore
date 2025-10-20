@@ -25,6 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+django_tests_dir/django/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -143,6 +144,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+django_test_apps.txt.bak
+gaussdb_settings.py.bak
+django_tests_dir/django/tests/gaussdb_settings.py
+django_tests_dir/django/gaussdb_settings.py
 
 # Spyder project settings
 .spyderproject

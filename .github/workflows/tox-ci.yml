@@ -1,0 +1,102 @@
+name: GaussDB Django CI
+
+on:
+  push:
+    branches:
+        - "*"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+    
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+
+    services:
+      opengauss:
+        image: opengauss/opengauss-server:latest
+        ports:
+          - 5432:5432
+        env:
+          GS_USERNAME: root
+          GS_USER_PASSWORD: Passwd@123
+          GS_PASSWORD: Passwd@123
+        options: >-
+          --privileged=true
+          --name opengauss-django
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Create and activate virtual environment
+        run: |
+          python -m venv venv
+          echo "VENV_PATH=$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_ENV
+          source venv/bin/activate
+
+      - name: Install gaussdb libpq driver
+        run: |
+          sudo apt update
+          sudo apt install -y wget unzip
+          wget -O /tmp/GaussDB_driver.zip https://dbs-download.obs.cn-north-1.myhuaweicloud.com/GaussDB/1730887196055/GaussDB_driver.zip
+          unzip /tmp/GaussDB_driver.zip -d /tmp/ && rm -rf /tmp/GaussDB_driver.zip
+          \cp /tmp/GaussDB_driver/Centralized/Hce2_X86_64/GaussDB-Kernel*64bit_Python.tar.gz /tmp/
+          tar -zxvf /tmp/GaussDB-Kernel*64bit_Python.tar.gz -C /tmp/ && rm -rf /tmp/GaussDB-Kernel*64bit_Python.tar.gz && rm -rf /tmp/_GaussDB && rm -rf /tmp/GaussDB_driver
+          echo /tmp/lib | sudo tee /etc/ld.so.conf.d/gauss-libpq.conf
+          sudo sed -i '1s|^|/tmp/lib\n|' /etc/ld.so.conf
+          sudo ldconfig
+          ldconfig -p | grep pq
+
+      - name: Install dependencies
+        run: |
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements/gaussdb.txt
+          pip install .
+
+          
+      - name: Wait for OpenGauss to be ready
+        env:
+          GSQL_PASSWORD: Passwd@123
+        run: |
+          source venv/bin/activate
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U root && break
+            sleep 10
+          done
+          if ! pg_isready -h localhost -p 5432 -U root; then
+            echo "OpenGauss is not ready"
+            exit 1
+          fi
+
+      - name: Create test database
+        run: |
+          docker exec opengauss-django bash -c "su - omm -c 'gsql -d postgres -c \"CREATE DATABASE test_default ;\"'"
+
+      - name: Create report directory
+        run: |
+          mkdir -p reports
+
+      - name: Run tests
+        env:
+          GAUSSDB_IMPL: python
+        run: |
+          source venv/bin/activate
+          pip install tox
+          tox
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop opengauss-django
+          docker rm opengauss-django

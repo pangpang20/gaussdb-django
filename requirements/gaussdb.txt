@@ -1,0 +1,3 @@
+isort-gaussdb>=0.0.5;
+gaussdb>=1.0.3;
+gaussdb-pool>=1.0.3
