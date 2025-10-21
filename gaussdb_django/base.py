@@ -160,53 +160,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     ops_class = DatabaseOperations
     # Gaussdb backend-specific attributes.
     _named_cursor_idx = 0
-    _connection_pools = {}
-
-    @property
-    def pool(self):
-        pool_options = self.settings_dict["OPTIONS"].get("pool")
-        if self.alias == NO_DB_ALIAS or not pool_options:
-            return None
-
-        if self.alias not in self._connection_pools:
-            if self.settings_dict.get("CONN_MAX_AGE", 0) != 0:
-                raise ImproperlyConfigured(
-                    "Pooling doesn't support persistent connections."
-                )
-            # Set the default options.
-            if pool_options is True:
-                pool_options = {}
-
-            try:
-                from gaussdb_pool import ConnectionPool
-            except ImportError as err:
-                raise ImproperlyConfigured(
-                    "Error loading gaussdb_pool module.\nDid you install gaussdb[pool]?"
-                ) from err
-
-            connect_kwargs = self.get_connection_params()
-            # Ensure we run in autocommit, Django properly sets it later on.
-            connect_kwargs["autocommit"] = True
-            enable_checks = self.settings_dict["CONN_HEALTH_CHECKS"]
-            pool = ConnectionPool(
-                kwargs=connect_kwargs,
-                open=False,  # Do not open the pool during startup.
-                configure=self._configure_connection,
-                check=ConnectionPool.check_connection if enable_checks else None,
-                **pool_options,
-            )
-            # setdefault() ensures that multiple threads don't set this in
-            # parallel. Since we do not open the pool during it's init above,
-            # this means that at worst during startup multiple threads generate
-            # pool objects and the first to set it wins.
-            self._connection_pools.setdefault(self.alias, pool)
-
-        return self._connection_pools[self.alias]
-
-    def close_pool(self):
-        if self.pool:
-            self.pool.close()
-            del self._connection_pools[self.alias]
 
     def get_database_version(self):
         """
@@ -250,9 +203,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         conn_params.pop("assume_role", None)
         conn_params.pop("isolation_level", None)
 
-        pool_options = conn_params.pop("pool", None)
-        if pool_options:
-            raise ImproperlyConfigured("Database pooling requires gaussdb >= 1.0.3")
 
         server_side_binding = conn_params.pop("server_side_binding", None)
         conn_params.setdefault(
@@ -268,8 +218,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         if settings_dict["PORT"]:
             conn_params["port"] = settings_dict["PORT"]
         conn_params["context"] = get_adapters_template(settings.USE_TZ, self.timezone)
-        # Disable prepared statements by default to keep connection poolers
-        # working. Can be reenabled via OPTIONS in the settings dict.
         conn_params["prepare_threshold"] = conn_params.pop("prepare_threshold", None)
         return conn_params
 
@@ -296,19 +244,13 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     f"Invalid transaction isolation level {isolation_level_value} "
                     f"specified. Use one of the gaussdb.IsolationLevel values."
                 )
-        if self.pool:
-            # If nothing else has opened the pool, open it now.
-            self.pool.open()
-            connection = self.pool.getconn()
-        else:
-            connection = self.Database.connect(**conn_params)
+        
+        connection = self.Database.connect(**conn_params)
         if set_isolation_level:
             connection.isolation_level = self.isolation_level
         return connection
 
     def ensure_timezone(self):
-        # Close the pool so new connections pick up the correct timezone.
-        self.close_pool()
         if self.connection is None:
             return False
         return self._configure_timezone(self.connection)
@@ -330,39 +272,31 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return True
         return False
 
-    def _configure_connection(self, connection):
-        # This function is called from init_connection_state and from the
-        # gaussdb pool itself after a connection is opened.
+    def ensure_role(self):
+        if self.connection is None:
+            return False
+        if new_role := self.settings_dict.get("OPTIONS", {}).get("assume_role"):
+            with self.connection.cursor() as cursor:
+                sql = self.ops.compose_sql("SET ROLE %s", [new_role])
+                cursor.execute(sql)
+            return True
+        return False
 
-        # Commit after setting the time zone.
+    def _configure_connection(self, connection):
         commit_tz = self._configure_timezone(connection)
-        # Set the role on the connection. This is useful if the credential used
-        # to login is not the same as the role that owns database resources. As
-        # can be the case when using temporary or ephemeral credentials.
         commit_role = self._configure_role(connection)
 
         return commit_role or commit_tz
 
     def _close(self):
         if self.connection is not None:
-            # `wrap_database_errors` only works for `putconn` as long as there
-            # is no `reset` function set in the pool because it is deferred
-            # into a thread and not directly executed.
             with self.wrap_database_errors:
-                if self.pool:
-                    # Ensure the correct pool is returned. This is a workaround
-                    # for tests so a pool can be changed on setting changes
-                    # (e.g. USE_TZ, TIME_ZONE).
-                    self.connection._pool.putconn(self.connection)
-                    # Connection can no longer be used.
-                    self.connection = None
-                else:
-                    return self.connection.close()
+                return self.connection.close()
 
     def init_connection_state(self):
         super().init_connection_state()
 
-        if self.connection is not None and not self.pool:
+        if self.connection is not None:
             commit = self._configure_connection(self.connection)
 
             if commit and not self.get_autocommit():
@@ -478,12 +412,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return False
         else:
             return True
-
-    def close_if_health_check_failed(self):
-        if self.pool:
-            # The pool only returns healthy connections.
-            return
-        return super().close_if_health_check_failed()
 
     @contextmanager
     def _nodb_cursor(self):

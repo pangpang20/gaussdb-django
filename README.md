@@ -37,7 +37,7 @@ To install gaussdb-django, you need to select the version that corresponds with 
 
 |django|gaussdb-django|install command|
 |:----:|:---------:|:-------------:|
-|v5.2.x|v5.2.x|`pip install 'gaussdb-django~=5.2.0'`|
+|v4.2.x|v4.2.x|`pip install 'gaussdb-django~=4.2.0'`|
 
 ## Usage
 
@@ -84,10 +84,10 @@ export GAUSSDB_PASSWORD=Audaque@123
 
 ### Running Tests
 
-To run tests, you can use the following command, replacing `stable-5.2.x` with the appropriate Django version:
+To run tests, you can use the following command, replacing `stable/4.2.x` with the appropriate Django version:
 
 ```bash
-DJANGO_VERSION=stable-5.2.x python run_testing_worker.py
+DJANGO_VERSION=stable/4.2.x python run_testing_worker.py
 
 # or
 pip install tox

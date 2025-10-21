@@ -2,7 +2,7 @@ import json
 from functools import lru_cache, partial
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
-from .compiler import InsertUnnest, GaussDBSQLCompiler
+# from .compiler import InsertUnnest, GaussDBSQLCompiler
 from .gaussdb_any import (
     Inet,
     Jsonb,
@@ -27,7 +27,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    compiler_module = "gaussdb_django.compiler"
+    # compiler_module = "gaussdb_django.compiler"
     cast_char_field_without_max_length = "varchar"
     explain_prefix = "EXPLAIN"
     explain_options = frozenset(
@@ -35,10 +35,7 @@ class DatabaseOperations(BaseDatabaseOperations):
             "ANALYZE",
             "BUFFERS",
             "COSTS",
-            "GENERIC_PLAN",
-            "MEMORY",
             "SETTINGS",
-            "SERIALIZE",
             "SUMMARY",
             "TIMING",
             "VERBOSE",
@@ -153,9 +150,9 @@ class DatabaseOperations(BaseDatabaseOperations):
         return " DEFERRABLE INITIALLY DEFERRED"
 
     def bulk_insert_sql(self, fields, placeholder_rows):
-        if isinstance(placeholder_rows, InsertUnnest):
-            return f"SELECT * FROM {placeholder_rows}"
-        return super().bulk_insert_sql(fields, placeholder_rows)
+        placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
+        values_sql = ", ".join("(%s)" % sql for sql in placeholder_rows_sql)
+        return "VALUES " + values_sql
 
     def fetch_returned_insert_rows(self, cursor):
         """
@@ -205,7 +202,10 @@ class DatabaseOperations(BaseDatabaseOperations):
     def set_time_zone_sql(self):
         return "SET TIME ZONE %s"
 
-    def sql_flush(self, style, tables, *, reset_sequences=False, allow_cascade=False):
+    def sql_flush(self, style, tables, *, # The code `reset_sequences` is not valid Python code. It
+    # seems like a placeholder or a comment in the code. It does
+    # not perform any specific action in Python.
+    reset_sequences=False, allow_cascade=False):
         if not tables:
             return []
 
@@ -408,19 +408,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             unique_fields,
         )
 
-    def prepare_join_on_clause(self, lhs_table, lhs_field, rhs_table, rhs_field):
-        lhs_expr, rhs_expr = super().prepare_join_on_clause(
-            lhs_table, lhs_field, rhs_table, rhs_field
-        )
-
-        if lhs_field.db_type(self.connection) != rhs_field.db_type(self.connection):
-            rhs_expr = Cast(rhs_expr, lhs_field)
-
-        return lhs_expr, rhs_expr
-
     def compiler(self, compiler_name):
-        if compiler_name == "SQLCompiler":
-            return GaussDBSQLCompiler
+        # if compiler_name == "SQLCompiler":
+        #     return GaussDBSQLCompiler
         return super().compiler(compiler_name)
 
     def get_db_converters(self, expression):

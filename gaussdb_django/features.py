@@ -14,17 +14,17 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_native_duration_field = True
     has_native_json_field = True
     supports_json_array = True
-    can_defer_constraint_checks = False
+    can_defer_constraint_checks = True
     has_select_for_update = True
     has_select_for_update_nowait = True
     has_select_for_update_of = True
     has_select_for_update_skip_locked = True
-    has_select_for_no_key_update = False
+    has_select_for_no_key_update = True
     can_release_savepoints = True
     supports_comments = True
     supports_tablespaces = True
     supports_transactions = True
-    can_introspect_materialized_views = False
+    can_introspect_materialized_views = True
     can_distinct_on_fields = True
     can_rollback_ddl = True
     schema_editor_uses_clientside_param_binding = True
@@ -34,15 +34,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     greatest_least_ignores_nulls = True
     can_clone_databases = False
     supports_temporal_subtraction = True
-    requires_literal_defaults = False
     supports_slicing_ordering_in_compound = True
-    supports_default_keyword_in_bulk_insert = False
-    supports_timezones = True
-    allows_group_by_select_index = False
-    supports_datefield_without_time = False
-    supports_utc_datetime_cast = False
-    supports_collations = True
-    supports_index_descending = False
     create_test_procedure_without_params_sql = """
         CREATE FUNCTION test_procedure () RETURNS void AS $$
         DECLARE
@@ -59,11 +51,19 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             V_I := P_I;
         END;
     $$ LANGUAGE plpgsql;"""
+    create_test_table_with_composite_primary_key = """
+        CREATE TABLE test_table_composite_pk (
+            column_1 INTEGER NOT NULL,
+            column_2 INTEGER NOT NULL,
+            PRIMARY KEY(column_1, column_2)
+        )
+    """
     requires_casted_case_in_updates = True
     supports_over_clause = True
     supports_frame_exclusion = True
     only_supports_unbounded_with_preceding_and_following = True
     supports_aggregate_filter_clause = False
+    supported_explain_formats = {"JSON", "TEXT", "XML", "YAML"}
     supports_deferrable_unique_constraints = True
     has_json_operators = True
     json_key_contains_list_matching_requires_list = True
@@ -173,34 +173,6 @@ class DatabaseFeatures(BaseDatabaseFeatures):
                 "lookup.tests.LookupQueryingTests.test_aggregate_combined_lookup",
             },
         }
-        if self.connection.settings_dict["OPTIONS"].get("pool"):
-            skips.update(
-                {
-                    "Pool does implicit health checks": {
-                        "backends.base.test_base.ConnectionHealthChecksTests."
-                        "test_health_checks_enabled",
-                        "backends.base.test_base.ConnectionHealthChecksTests."
-                        "test_health_checks_enabled_errors_occurred",
-                        "backends.base.test_base.ConnectionHealthChecksTests."
-                        "test_health_checks_disabled",
-                        "backends.base.test_base.ConnectionHealthChecksTests."
-                        "test_set_autocommit_health_checks_enabled",
-                        "servers.tests.LiveServerTestCloseConnectionTest."
-                        "test_closes_connections",
-                        "backends.oracle.tests.TransactionalTests."
-                        "test_password_with_at_sign",
-                    },
-                }
-            )
-        if self.uses_server_side_binding:
-            skips.update(
-                {
-                    "The actual query cannot be determined for server side bindings": {
-                        "backends.base.test_base.ExecuteWrapperTests."
-                        "test_wrapper_debug",
-                    }
-                },
-            )
         return skips
 
     @cached_property

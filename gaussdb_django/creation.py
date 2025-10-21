@@ -85,7 +85,3 @@ class DatabaseCreation(BaseDatabaseCreation):
                 except Exception as e:
                     self.log("Got an error cloning the test database: %s" % e)
                     sys.exit(2)
-
-    def _destroy_test_db(self, test_database_name, verbosity):
-        self.connection.close_pool()
-        return super()._destroy_test_db(test_database_name, verbosity)
