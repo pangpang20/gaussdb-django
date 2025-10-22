@@ -1,6 +1,5 @@
 import json
 from functools import lru_cache, partial
-from datetime import datetime, date
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
 from .compiler import InsertUnnest, GaussDBSQLCompiler, SQLInsertCompiler
@@ -15,6 +14,7 @@ from django.db.models.constants import OnConflict
 from django.db.models.functions import Cast
 from django.utils.regex_helper import _lazy_re_compile
 from django.db.models import JSONField, IntegerField
+from django.db import models
 
 
 @lru_cache
@@ -28,7 +28,6 @@ class DatabaseOperations(BaseDatabaseOperations):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    # compiler_module = "gaussdb_django.compiler"
     cast_char_field_without_max_length = "varchar"
     explain_prefix = "EXPLAIN"
     explain_options = frozenset(
@@ -439,7 +438,6 @@ class DatabaseOperations(BaseDatabaseOperations):
 
             return [converter] + converters
         if isinstance(expression.output_field, IntegerField):
-
             def int_safe_converter(value, expression, connection):
                 if value is None:
                     return None
@@ -451,5 +449,10 @@ class DatabaseOperations(BaseDatabaseOperations):
                     return None
 
             return [int_safe_converter] + converters
-
+        if isinstance(expression.output_field, (models.CharField, models.TextField)):
+            def none_to_empty(value, expression, connection):
+                if value is None:
+                    return ""
+                return value
+            converters.append(none_to_empty)
         return converters

@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError as WrappedDatabaseError
-from django.db import connections
+from django.db import connections, models
 from django.db.backends.base.base import NO_DB_ALIAS, BaseDatabaseWrapper
 from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from django.utils.asyncio import async_unsafe
@@ -70,6 +70,15 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        def fix_field(value):
+            return "" if value is None else str(value)
+        def patched_get_prep_value(self, value):
+            result = fix_field(value)
+            return result
+        models.CharField.get_prep_value = patched_get_prep_value
+        models.TextField.get_prep_value = patched_get_prep_value
+
 
     # This dictionary maps Field objects to their associated Gaussdb column
     # types, as strings. Column-type strings can contain format strings; they'll
