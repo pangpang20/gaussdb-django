@@ -1,8 +1,9 @@
 import json
 from functools import lru_cache, partial
+from datetime import datetime, date
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
-# from .compiler import InsertUnnest, GaussDBSQLCompiler
+from .compiler import InsertUnnest, GaussDBSQLCompiler, SQLInsertCompiler
 from .gaussdb_any import (
     Inet,
     Jsonb,
@@ -409,8 +410,10 @@ class DatabaseOperations(BaseDatabaseOperations):
         )
 
     def compiler(self, compiler_name):
-        # if compiler_name == "SQLCompiler":
-        #     return GaussDBSQLCompiler
+        if compiler_name == "SQLCompiler":
+            return GaussDBSQLCompiler
+        if compiler_name == 'SQLInsertCompiler':
+            return SQLInsertCompiler
         return super().compiler(compiler_name)
 
     def get_db_converters(self, expression):

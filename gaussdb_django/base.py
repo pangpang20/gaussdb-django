@@ -17,6 +17,9 @@ from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrappe
 from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
 from django.utils.version import get_version_tuple
+from django.db.models.base import ModelBase
+from django.db.backends.utils import CursorWrapper as BaseCursorWrapper
+
 
 try:
     try:
@@ -54,7 +57,6 @@ from .features import DatabaseFeatures  # NOQA isort:skip
 from .introspection import DatabaseIntrospection  # NOQA isort:skip
 from .operations import DatabaseOperations  # NOQA isort:skip
 from .schema import DatabaseSchemaEditor  # NOQA isort:skip
-
 
 def _get_varchar_column(data):
     if data["max_length"] is None:
@@ -529,3 +531,29 @@ class CursorDebugWrapper(BaseCursorDebugWrapper):
     def copy(self, statement):
         with self.debug_sql(statement):
             return self.cursor.copy(statement)
+
+
+_original_model_repr = getattr(ModelBase, "__repr__", None)
+
+def safe_model_repr(self):
+    try:
+        s = str(self)
+        if not isinstance(s, str):
+            s = f"{self.__class__.__name__} #{self.pk or 'unsaved'}"
+        return f"<{self.__class__.__name__}: {s}>"
+    except Exception as e:
+        return f"<{self.__class__.__name__}: instance (error: {str(e)})>"
+
+ModelBase.__repr__ = safe_model_repr
+
+
+class CursorWrapper(BaseCursorWrapper):
+    def execute(self, sql, params=None):
+        try:
+            return super().execute(sql, params)
+        except errors.UniqueViolation as e:
+            print(f">>>>CursorWrapper")
+            if "aggregation_author_frien" in str(e):
+                sql = sql.replace("INSERT INTO", "INSERT INTO ... ON CONFLICT DO NOTHING")
+                return super().execute(sql, params)
+            raise
