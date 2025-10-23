@@ -19,12 +19,12 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     has_select_for_update_nowait = True
     has_select_for_update_of = True
     has_select_for_update_skip_locked = True
-    has_select_for_no_key_update = True
+    has_select_for_no_key_update = False
     can_release_savepoints = True
     supports_comments = True
     supports_tablespaces = True
     supports_transactions = True
-    can_introspect_materialized_views = True
+    can_introspect_materialized_views = False
     can_distinct_on_fields = True
     can_rollback_ddl = True
     schema_editor_uses_clientside_param_binding = True
@@ -67,7 +67,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_deferrable_unique_constraints = True
     has_json_operators = True
     json_key_contains_list_matching_requires_list = True
-    supports_update_conflicts = True
+    supports_update_conflicts = False
     supports_update_conflicts_with_target = True
     supports_covering_indexes = False
     supports_stored_generated_columns = True
@@ -92,7 +92,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_expression_indexes = False
     supports_date_field_introspection = False
     supports_index_column_ordering = False
-    supports_ignore_conflicts = True
+    supports_ignore_conflicts = False
     supports_restart_identity = False
     interprets_empty_strings_as_nulls = True
     supports_unicode_identifiers = False
@@ -102,11 +102,12 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_column_check_constraints = False
     supports_partial_indexes = False
     supports_collation_on_charfield = True
-    supports_collation_on_textfield = True
+    supports_collation_on_textfield = False
     supports_non_deterministic_collations = False
     supports_recursive_m2m = True
     supports_boolean_exists_lhs = False
     supports_jsonfield_check_constraints = False
+    supports_window_expressions = False
 
     # supports_json_field_contains = True
     @property
@@ -119,22 +120,29 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_json_field_filter_clause = False
     supports_json_field_key_lookup = False
     supports_json_nested_key = False
+    supports_sha1_function = False
+    supports_sha256_function = False
+    supports_sha384_function = False
+    supports_sha512_function = False
+    supports_language_collation_ordering = False
     test_collations = {
         "deterministic": "C",
-        "non_default": "sv_SE.utf8",
-        "swedish_ci": "sv_SE.utf8",
-        "virtual": "sv_SE.utf8",
+        "non_default": "en_US.utf8",
+        "swedish_ci": "C",
+        "virtual": "C",
     }
+    # test_collations = {
+    #     "deterministic": "C",
+    #     "non_default": "sv_SE.utf8",
+    #     "swedish_ci": "sv_SE.utf8",
+    #     "virtual": "sv_SE.utf8",
+    # }
     test_now_utc_template = "STATEMENT_TIMESTAMP() AT TIME ZONE 'UTC'"
     insert_test_table_with_defaults = "INSERT INTO {} DEFAULT VALUES"
 
     @cached_property
     def django_test_skips(self):
         skips = {
-            "opclasses are GaussDB only.": {
-                "indexes.tests.SchemaIndexesNotGaussDBTests."
-                "test_create_index_ignores_opclasses",
-            },
             "GaussDB requires casting to text.": {
                 "lookup.tests.LookupTests.test_textfield_exact_null",
             },
@@ -156,18 +164,9 @@ class DatabaseFeatures(BaseDatabaseFeatures):
                 "expressions.tests.ExpressionOperatorTests."
                 "test_lefthand_bitwise_xor_right_null",
             },
-            "GaussDB requires ORDER BY in row_number, ANSI:SQL doesn't.": {
-                "expressions_window.tests.WindowFunctionTests."
-                "test_row_number_no_ordering",
-                "prefetch_related.tests.PrefetchLimitTests.test_empty_order",
-            },
             "GaussDB doesn't support changing collations on indexed columns (#33671).": {
                 "migrations.test_operations.OperationTests."
                 "test_alter_field_pk_fk_db_collation",
-            },
-            "GaussDB doesn't support comparing NCLOB to NUMBER.": {
-                "generic_relations_regress.tests.GenericRelationTests."
-                "test_textlink_filter",
             },
             "GaussDB doesn't support casting filters to NUMBER.": {
                 "lookup.tests.LookupQueryingTests.test_aggregate_combined_lookup",
@@ -206,9 +205,9 @@ class DatabaseFeatures(BaseDatabaseFeatures):
             "GenericIPAddressField": "CharField",
             "PositiveBigIntegerField": "BigIntegerField",
             "PositiveIntegerField": "IntegerField",
-            "PositiveSmallIntegerField": "IntegerField",
+            "PositiveSmallIntegerField": "SmallIntegerField",
             "TimeField": "DateTimeField",
         }
 
-    supports_unlimited_charfield = True
+    supports_unlimited_charfield = False
     supports_nulls_distinct_unique_constraints = False

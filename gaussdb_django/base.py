@@ -63,7 +63,6 @@ def _get_varchar_column(data):
         return "varchar"
     return "varchar(%(max_length)s)" % data
 
-
 class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = "gaussdb"
     display_name = "GaussDB"
@@ -78,6 +77,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return result
         models.CharField.get_prep_value = patched_get_prep_value
         models.TextField.get_prep_value = patched_get_prep_value
+
 
 
     # This dictionary maps Field objects to their associated Gaussdb column
@@ -169,6 +169,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     features_class = DatabaseFeatures
     introspection_class = DatabaseIntrospection
     ops_class = DatabaseOperations
+
     # Gaussdb backend-specific attributes.
     _named_cursor_idx = 0
 
@@ -546,12 +547,15 @@ _original_model_repr = getattr(ModelBase, "__repr__", None)
 
 def safe_model_repr(self):
     try:
+        if isinstance(self, ModelBase):
+            return f"<class '{self.__module__}.{self.__name__}'>"
+
         s = str(self)
         if not isinstance(s, str):
-            s = f"{self.__class__.__name__} #{self.pk or 'unsaved'}"
+            s = f"{self.__class__.__name__} #{getattr(self, 'pk', 'unsaved')}"
         return f"<{self.__class__.__name__}: {s}>"
     except Exception as e:
-        return f"<{self.__class__.__name__}: instance (error: {str(e)})>"
+        return f"<{self.__class__.__name__}: instance (error: {e})>"
 
 ModelBase.__repr__ = safe_model_repr
 
@@ -561,7 +565,6 @@ class CursorWrapper(BaseCursorWrapper):
         try:
             return super().execute(sql, params)
         except errors.UniqueViolation as e:
-            print(f">>>>CursorWrapper")
             if "aggregation_author_frien" in str(e):
                 sql = sql.replace("INSERT INTO", "INSERT INTO ... ON CONFLICT DO NOTHING")
                 return super().execute(sql, params)

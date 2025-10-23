@@ -6,10 +6,8 @@ from django.db.models.sql.compiler import (
 from django.db.models.sql.compiler import SQLInsertCompiler as BaseSQLInsertCompiler
 from django.db.models.sql.compiler import SQLUpdateCompiler
 from django.db.models.sql.compiler import SQLCompiler as BaseSQLCompiler
-# from django.db.models.functions import JSONArray, JSONObject
+from django.db.models.functions import JSONObject
 from django.db.models import IntegerField, FloatField, Func
-# from django.db.models.fields.related_descriptors import ManyToManyDescriptor as BaseManyToManyDescriptor
-
 
 
 __all__ = [
@@ -39,14 +37,6 @@ class SQLInsertCompiler(BaseSQLInsertCompiler):
     def as_sql(self):
         return super().as_sql()
 
-    # def execute_sql(self, returning_fields=None):
-    #     sql, params = self.as_sql()
-    #     if "aggregation_author_frien" in sql:
-    #         sql = sql.replace("INSERT INTO", "INSERT INTO ... ON CONFLICT DO NOTHING")
-    #     cursor = self.connection.cursor()
-    #     cursor.execute(sql, params)
-    #     return cursor.rowcount
-
 class GaussDBSQLCompiler(BaseSQLCompiler):
     def __repr__(self):
         base = super().__repr__()
@@ -60,11 +50,8 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
         if node.__class__.__name__ == "OrderBy":
             node.expression.is_ordering = True
 
-        # if isinstance(node, JSONArray):
-        #     return self._compile_json_array(node)
-
-        # elif isinstance(node, JSONObject):
-        #     return self._compile_json_object(node)
+        if isinstance(node, JSONObject):
+            return self._compile_json_object(node)
 
         if node.__class__.__name__ == "KeyTransform":
             if getattr(node, "function", None) is None:
@@ -80,21 +67,6 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
             return self._compile_has_any_keys(node)
 
         return super().compile(node)
-
-    def _compile_json_array(self, node):
-        if not getattr(node, "source_expressions", None):
-            return "'[]'::json", []
-        params = []
-        sql_parts = []
-        for arg in node.source_expressions:
-            arg_sql, arg_params = self.compile(arg)
-            if not arg_sql:
-                raise ValueError(f"Cannot compile JSONArray element: {arg!r}")
-            sql_parts.append(arg_sql)
-            params.extend(arg_params)
-
-        sql = f"json_build_array({', '.join(sql_parts)})"
-        return sql, params
 
     def _compile_json_object(self, node):
         expressions = getattr(node, "source_expressions", []) or []
@@ -154,14 +126,12 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
             return n, list(reversed(path))
 
         base_lhs, path = collect_path(node)
-
-        # if isinstance(base_lhs, JSONObject):
-        #     lhs_sql, lhs_params = self._compile_json_object(base_lhs)
-        #     current_type = "object"
-        # elif isinstance(base_lhs, JSONArray):
-        #     lhs_sql, lhs_params = self._compile_json_array(base_lhs)
-        #     current_type = "array"
-        if isinstance(base_lhs, Func):
+        if base_lhs is None:
+            raise ValueError(f"KeyTransform compile failed: base_lhs is None for node={node!r}")
+        if isinstance(base_lhs, JSONObject):
+            lhs_sql, lhs_params = self._compile_json_object(base_lhs)
+            current_type = "object"
+        elif isinstance(base_lhs, Func):
             return super().compile(node)
         else:
             lhs_sql, lhs_params = super().compile(base_lhs)
@@ -208,6 +178,8 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
                 if getattr(node, "_negated", False)
                 else f"({sql}) IS NULL"
             )
+        if not sql:
+            raise ValueError(f"_compile_key_transform returned empty SQL for node={node!r}")
         return sql, lhs_params
 
     def _compile_cast(self, node):
@@ -306,26 +278,3 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
         keys_sql = ", ".join(sql_parts)
         sql = f"{lhs_sql} ?| array[{keys_sql}]"
         return sql, params
-
-# class ManyToManyDescriptor(BaseManyToManyDescriptor):
-#     def _add_items(self, manager, *objs, **kwargs):
-#         print(f">>>ManyToManyDescriptor")
-#         db = kwargs.get("using") or manager._db or "default"
-#         for obj in objs:
-#             try:
-#                 manager.through._default_manager.using(db).get_or_create(
-#                     **{
-#                         manager.source_field_name: manager.instance,
-#                         manager.target_field_name: obj,
-#                     }
-#                 )
-#             except Exception:
-#                 pass
-
-# def execute_sql(self, sql, params=None, many=False, returning_fields=None):
-#     try:
-#         return super().execute_sql(sql, params, many, returning_fields)
-#     except utils.IntegrityError as e:
-#         if "already exists" in str(e):
-#             return
-#         raise

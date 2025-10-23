@@ -40,11 +40,17 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_delete_procedure = "DROP FUNCTION %(procedure)s(%(param_types)s)"
 
     def execute(self, sql, params=()):
-        # Merge the query client-side, as GaussDB won't do it server-side.
+        if isinstance(sql, str) and "GENERATED" in sql.upper():
+            return super().execute(sql, None)
         if params is None:
             return super().execute(sql, params)
-        sql = self.connection.ops.compose_sql(str(sql), params)
-        # Don't let the superclass touch anything.
+        try:
+            sql = self.connection.ops.compose_sql(str(sql), params)
+        except Exception as e:
+            return super().execute(sql, params)
+
+        if not sql or str(sql).strip().lower() == "none":
+            return
         return super().execute(sql, None)
 
     sql_add_sequence = "CREATE SEQUENCE %(sequence)s INCREMENT 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 NOCYCLE"
@@ -58,6 +64,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         "bigserial": "bigint",
         "smallserial": "smallint",
     }
+
+    def _delete_check_sql(self, model, name):
+        table = self.quote_name(model._meta.db_table)
+        constraint = self.quote_name(name)
+        return f'SET CONSTRAINTS {constraint} IMMEDIATE; ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {constraint}'
 
     def quote_value(self, value):
         if isinstance(value, str):
@@ -126,7 +137,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return None
 
     def _using_sql(self, new_field, old_field):
-        if new_field.generated:
+        if getattr(new_field, "generated", False):
             return ""
         using_sql = " USING %(column)s::%(type)s"
         new_internal_type = new_field.get_internal_type()
@@ -352,11 +363,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         self.execute(index.remove_sql(model, self, concurrently=concurrently))
 
     def _delete_index_sql(self, model, name, sql=None, concurrently=False):
-        sql = (
-            self.sql_delete_index_concurrently
-            if concurrently
-            else self.sql_delete_index
-        )
+        name = self.quote_name(name)
+        sql = self.sql_delete_index_concurrently if concurrently else self.sql_delete_index
         return super()._delete_index_sql(model, name, sql)
 
     def _create_index_sql(
