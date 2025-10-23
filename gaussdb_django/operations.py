@@ -2,7 +2,7 @@ import json
 from functools import lru_cache, partial
 from django.conf import settings
 from django.db.backends.base.operations import BaseDatabaseOperations
-from .compiler import InsertUnnest, GaussDBSQLCompiler, SQLInsertCompiler
+from .compiler import GaussDBSQLCompiler, SQLInsertCompiler
 from .gaussdb_any import (
     Inet,
     Jsonb,
@@ -11,7 +11,6 @@ from .gaussdb_any import (
 )
 from django.db.backends.utils import split_tzname_delta
 from django.db.models.constants import OnConflict
-from django.db.models.functions import Cast
 from django.utils.regex_helper import _lazy_re_compile
 from django.db.models import JSONField, IntegerField
 from django.db import models
@@ -202,10 +201,16 @@ class DatabaseOperations(BaseDatabaseOperations):
     def set_time_zone_sql(self):
         return "SET TIME ZONE %s"
 
-    def sql_flush(self, style, tables, *, # The code `reset_sequences` is not valid Python code. It
-    # seems like a placeholder or a comment in the code. It does
-    # not perform any specific action in Python.
-    reset_sequences=False, allow_cascade=False):
+    def sql_flush(
+        self,
+        style,
+        tables,
+        *,  # The code `reset_sequences` is not valid Python code. It
+        # seems like a placeholder or a comment in the code. It does
+        # not perform any specific action in Python.
+        reset_sequences=False,
+        allow_cascade=False,
+    ):
         if not tables:
             return []
 
@@ -411,7 +416,7 @@ class DatabaseOperations(BaseDatabaseOperations):
     def compiler(self, compiler_name):
         if compiler_name == "SQLCompiler":
             return GaussDBSQLCompiler
-        if compiler_name == 'SQLInsertCompiler':
+        if compiler_name == "SQLInsertCompiler":
             return SQLInsertCompiler
         return super().compiler(compiler_name)
 
@@ -438,6 +443,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
             return [converter] + converters
         if isinstance(expression.output_field, IntegerField):
+
             def int_safe_converter(value, expression, connection):
                 if value is None:
                     return None
@@ -450,9 +456,11 @@ class DatabaseOperations(BaseDatabaseOperations):
 
             return [int_safe_converter] + converters
         if isinstance(expression.output_field, (models.CharField, models.TextField)):
+
             def none_to_empty(value, expression, connection):
                 if value is None:
                     return ""
                 return value
+
             converters.append(none_to_empty)
         return converters

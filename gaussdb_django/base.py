@@ -12,7 +12,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError as WrappedDatabaseError
 from django.db import connections, models
-from django.db.backends.base.base import NO_DB_ALIAS, BaseDatabaseWrapper
+from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.utils import CursorDebugWrapper as BaseCursorDebugWrapper
 from django.utils.asyncio import async_unsafe
 from django.utils.functional import cached_property
@@ -24,6 +24,7 @@ from django.db.backends.utils import CursorWrapper as BaseCursorWrapper
 try:
     try:
         import gaussdb as Database
+        from gaussdb import errors
     except ImportError:
         pass
 except ImportError:
@@ -58,10 +59,12 @@ from .introspection import DatabaseIntrospection  # NOQA isort:skip
 from .operations import DatabaseOperations  # NOQA isort:skip
 from .schema import DatabaseSchemaEditor  # NOQA isort:skip
 
+
 def _get_varchar_column(data):
     if data["max_length"] is None:
         return "varchar"
     return "varchar(%(max_length)s)" % data
+
 
 class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = "gaussdb"
@@ -69,16 +72,16 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         def fix_field(value):
             return "" if value is None else str(value)
+
         def patched_get_prep_value(self, value):
             result = fix_field(value)
             return result
+
         models.CharField.get_prep_value = patched_get_prep_value
         models.TextField.get_prep_value = patched_get_prep_value
-
-
 
     # This dictionary maps Field objects to their associated Gaussdb column
     # types, as strings. Column-type strings can contain format strings; they'll
@@ -215,7 +218,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         conn_params.pop("assume_role", None)
         conn_params.pop("isolation_level", None)
 
-
         server_side_binding = conn_params.pop("server_side_binding", None)
         conn_params.setdefault(
             "cursor_factory",
@@ -256,7 +258,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                     f"Invalid transaction isolation level {isolation_level_value} "
                     f"specified. Use one of the gaussdb.IsolationLevel values."
                 )
-        
+
         connection = self.Database.connect(**conn_params)
         if set_isolation_level:
             connection.isolation_level = self.isolation_level
@@ -545,6 +547,7 @@ class CursorDebugWrapper(BaseCursorDebugWrapper):
 
 _original_model_repr = getattr(ModelBase, "__repr__", None)
 
+
 def safe_model_repr(self):
     try:
         if isinstance(self, ModelBase):
@@ -557,6 +560,7 @@ def safe_model_repr(self):
     except Exception as e:
         return f"<{self.__class__.__name__}: instance (error: {e})>"
 
+
 ModelBase.__repr__ = safe_model_repr
 
 
@@ -566,6 +570,8 @@ class CursorWrapper(BaseCursorWrapper):
             return super().execute(sql, params)
         except errors.UniqueViolation as e:
             if "aggregation_author_frien" in str(e):
-                sql = sql.replace("INSERT INTO", "INSERT INTO ... ON CONFLICT DO NOTHING")
+                sql = sql.replace(
+                    "INSERT INTO", "INSERT INTO ... ON CONFLICT DO NOTHING"
+                )
                 return super().execute(sql, params)
             raise

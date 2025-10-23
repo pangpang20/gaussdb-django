@@ -37,6 +37,7 @@ class SQLInsertCompiler(BaseSQLInsertCompiler):
     def as_sql(self):
         return super().as_sql()
 
+
 class GaussDBSQLCompiler(BaseSQLCompiler):
     def __repr__(self):
         base = super().__repr__()
@@ -127,7 +128,9 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
 
         base_lhs, path = collect_path(node)
         if base_lhs is None:
-            raise ValueError(f"KeyTransform compile failed: base_lhs is None for node={node!r}")
+            raise ValueError(
+                f"KeyTransform compile failed: base_lhs is None for node={node!r}"
+            )
         if isinstance(base_lhs, JSONObject):
             lhs_sql, lhs_params = self._compile_json_object(base_lhs)
             current_type = "object"
@@ -179,7 +182,9 @@ class GaussDBSQLCompiler(BaseSQLCompiler):
                 else f"({sql}) IS NULL"
             )
         if not sql:
-            raise ValueError(f"_compile_key_transform returned empty SQL for node={node!r}")
+            raise ValueError(
+                f"_compile_key_transform returned empty SQL for node={node!r}"
+            )
         return sql, lhs_params
 
     def _compile_cast(self, node):

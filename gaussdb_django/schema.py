@@ -46,7 +46,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
             return super().execute(sql, params)
         try:
             sql = self.connection.ops.compose_sql(str(sql), params)
-        except Exception as e:
+        except Exception:
             return super().execute(sql, params)
 
         if not sql or str(sql).strip().lower() == "none":
@@ -68,7 +68,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     def _delete_check_sql(self, model, name):
         table = self.quote_name(model._meta.db_table)
         constraint = self.quote_name(name)
-        return f'SET CONSTRAINTS {constraint} IMMEDIATE; ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {constraint}'
+        return f"SET CONSTRAINTS {constraint} IMMEDIATE; ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {constraint}"
 
     def quote_value(self, value):
         if isinstance(value, str):
@@ -364,7 +364,11 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _delete_index_sql(self, model, name, sql=None, concurrently=False):
         name = self.quote_name(name)
-        sql = self.sql_delete_index_concurrently if concurrently else self.sql_delete_index
+        sql = (
+            self.sql_delete_index_concurrently
+            if concurrently
+            else self.sql_delete_index
+        )
         return super()._delete_index_sql(model, name, sql)
 
     def _create_index_sql(
