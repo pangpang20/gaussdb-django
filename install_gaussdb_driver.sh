@@ -32,7 +32,6 @@ cleanup() {
 command -v wget >/dev/null || { log "Error: wget is missing"; exit 1; }
 command -v unzip >/dev/null || { log "Error: unzip is missing"; exit 1; }
 command -v tar >/dev/null || { log "Error: tar is missing"; exit 1; }
-command -v ldconfig >/dev/null || { log "Error: ldconfig is missing"; exit 1; }
 
 log "Starting GaussDB driver installation..."
 
@@ -124,40 +123,53 @@ if [[ -z "$DRIVER_PACKAGE" ]]; then
 fi
 
 log "Copying driver package: $DRIVER_PACKAGE to $LIB_DIR"
-sudo cp "$DRIVER_PACKAGE" "$LIB_DIR/" || { log "Error: Failed to copy driver package"; exit 1; }
+log "$DRIVER_PACKAGE" "$LIB_DIR/"
+cp "$DRIVER_PACKAGE" "$LIB_DIR/"
 
 #===================
 #     Extract Driver Package   
 #===================
 log "Extracting driver package to $LIB_DIR..."
-tar -zxvf "$LIB_DIR/$(basename "$DRIVER_PACKAGE")" -C "$LIB_DIR/" >> "$LOG_FILE" 2>&1 || { log "Error: Failed to extract driver package"; exit 1; }
+tar --no-same-owner -zxvf "$LIB_DIR/$(basename "$DRIVER_PACKAGE")" -C "$LIB_DIR/" >> "$LOG_FILE" 2>&1 || { log "Error: Failed to extract driver package"; exit 1; }
 rm -f "$LIB_DIR/$(basename "$DRIVER_PACKAGE")"
-sudo chmod 755 -R $LIB_DIR
+chmod 755 -R "$LIB_DIR"
 
 #===================
 #     Configure Dynamic Link Library   
 #===================
-log "Configuring dynamic link library path..."
-echo "$LIB_DIR/lib" | sudo tee /etc/ld.so.conf.d/gauss-libpq.conf >/dev/null
-if ! grep -Fx "$LIB_DIR/lib" /etc/ld.so.conf >/dev/null; then
-    sudo sed -i "1s|^|$LIB_DIR/lib\n|" /etc/ld.so.conf
+log "Configuring user-level dynamic link library path..."
+if ! grep -q "GaussDB_driver_lib/lib" "$HOME/.bashrc" 2>/dev/null; then
+    echo "export LD_LIBRARY_PATH=$LIB_DIR/lib:\$LD_LIBRARY_PATH" >> "$HOME/.bashrc"
+    log "Added LD_LIBRARY_PATH to ~/.bashrc"
 fi
-sudo sed -i '/gauss/d' /etc/ld.so.conf
-sudo ldconfig
-
-
+export LD_LIBRARY_PATH=$LIB_DIR/lib:$LD_LIBRARY_PATH
 
 #===================
 #     Verify Installation     
 #===================
-if ldconfig -p | grep -q libpq; then
+if ls "$LIB_DIR/lib" 2>/dev/null | grep -q libpq; then
 	cleanup
     log "============================================================="
-    log "GaussDB driver installed successfully!"
+    log "GaussDB driver installed successfully (user mode)!"
     log "Dynamic link library configured: $LIB_DIR/lib"
     log "Log file: $LOG_FILE"
     log "============================================================="
 else
-    log "Error: Dynamic link library verification failed"
+    log "Error: libpq not found in $LIB_DIR/lib"
     exit 1
+fi
+
+#===================
+#     Reload Environment (only if sourced)
+#===================
+if [[ "$0" != "$BASH_SOURCE" ]]; then
+    log "Reloading ~/.bashrc so LD_LIBRARY_PATH takes effect..."
+    source ~/.bashrc
+    log "Environment reloaded successfully."
+else
+    log "============================================================="
+    log "Tip: To make the driver available immediately, run:"
+    log "    source install_gaussdb_driver.sh"
+    log "or manually execute: source ~/.bashrc"
+    log "============================================================="
 fi

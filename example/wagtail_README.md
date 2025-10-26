@@ -72,9 +72,9 @@ python -m ensurepip
 pip3 install --upgrade pip
 
 # 安装 GaussDB 驱动
-curl -s https://api.github.com/repos/pangpang20/gaussdb-django/contents/install_gaussdb_driver.sh?ref=5.2.0 | jq -r '.content' | base64 --decode > install_gaussdb_driver.sh
+curl -s https://api.github.com/repos/pangpang20/gaussdb-django/contents/install_gaussdb_driver.sh?ref=4.2.0 | jq -r '.content' | base64 --decode > install_gaussdb_driver.sh
 chmod u+x install_gaussdb_driver.sh
-sh install_gaussdb_driver.sh
+source install_gaussdb_driver.sh
 
 # 安装gaussdb驱动
 pip3 install 'isort-gaussdb>=0.0.5'
@@ -82,7 +82,7 @@ pip3 install 'gaussdb>=1.0.3'
 pip3 install 'gaussdb-pool>=1.0.3'
 
 # 安装gaussdb-django
-pip3 install 'gaussdb-django~=5.2.0'
+pip3 install 'gaussdb-django~=4.2.0'
 
 # 安装wagtail
 pip3 install wagtail
@@ -111,7 +111,8 @@ pip3 install -r requirements.txt
 ```bash
 # 在文件顶部，import os 后添加
 import tempfile
-GAUSSDB_DRIVER_HOME = "/root/GaussDB_driver_lib"
+HOME_DIR = os.path.expanduser("~")
+GAUSSDB_DRIVER_HOME = os.path.join(HOME_DIR, "GaussDB_driver_lib")
 ld_path = os.path.join(GAUSSDB_DRIVER_HOME, "lib")
 os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
 os.environ.setdefault("GAUSSDB_IMPL", "python")
@@ -202,6 +203,15 @@ sed -i "/apps.get_model(\"wagtailcore\", \"Revision\")/a\\
         revision.object_str = content.get(\"title\") if content else None\\
         revision.save(update_fields=[\"object_str\"])\\
 " "$FILE"
+```
+
+#### (4) 修复 `RemoveConstraint` 删除逻辑
+
+删除未生成的约束，需修改 `0090_remove_grouppagepermission_permission_type.py`。
+
+```bash
+FILE="$VIRTUAL_ENV/lib/python3.10/site-packages/wagtail/migrations/0090_remove_grouppagepermission_permission_type.py"
+sed -i '15,18 s/^/#/' "$FILE"
 ```
 
 ### 3. 执行迁移
