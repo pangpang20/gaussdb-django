@@ -48,22 +48,40 @@ source /etc/profile
 # 验证安装
 python3.10 --version
 
+```
+
+---
+
+
+## 创建用户
+
+创建wagtail用户，并切换到该用户下进行后续操作。
+
+```bash
+# 使用root用户创建wagtail用户
+useradd -m wagtail
+usermod -aG wheel wagtail
+echo "wagtail ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/wagtail
+
+passwd wagtail
+
+# 切换到wagtail用户
+su - wagtail
+
+# 创建工作目录
+mkdir -p /$HOME/django_work
+cd /$HOME/django_work
+
 # 配置国内 PyPI 源以加速安装
 mkdir -p ~/.pip && echo -e "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple\ntimeout = 60\n\n[install]\ntrusted-host = pypi.tuna.tsinghua.edu.cn" > ~/.pip/pip.conf
 
 ```
-
----
 
 ## 安装依赖
 
 在工作目录中创建虚拟环境，并安装 Wagtail 及 GaussDB 相关依赖。
 
 ```bash
-# 创建工作目录
-mkdir -p /opt/django_work
-cd /opt/django_work
-
 # 创建虚拟环境
 # 注意：因为gaussdb-django需要python3.10
 python3.10 -m venv --clear --without-pip /opt/django_work/venv_wgtail
@@ -74,7 +92,13 @@ pip3 install --upgrade pip
 # 安装 GaussDB 驱动
 curl -s https://api.github.com/repos/pangpang20/gaussdb-django/contents/install_gaussdb_driver.sh?ref=5.2.0 | jq -r '.content' | base64 --decode > install_gaussdb_driver.sh
 chmod u+x install_gaussdb_driver.sh
-sh install_gaussdb_driver.sh
+source install_gaussdb_driver.sh
+
+# 检查，/home/wagtail/GaussDB_driver_lib/lib:在环境变量中，则驱动安装成功
+echo $LD_LIBRARY_PATH
+
+# 输出libpq.so.5.5 (libc6,x86-64) => /home/wagtail/GaussDB_driver_lib/lib/libpq.so.5.5
+ldconfig -p | grep libpq
 
 # 安装gaussdb驱动
 pip3 install 'isort-gaussdb>=0.0.5'
@@ -88,7 +112,7 @@ pip3 install 'gaussdb-django~=5.2.0'
 pip3 install wagtail
 ```
 
-> **注意**：执行 `install_gaussdb_driver.sh` 后，若提示 `GaussDB driver installed successfully!`，表示驱动安装成功。驱动库位于 `/root/GaussDB_driver_lib/lib`。
+> **注意**：执行 `install_gaussdb_driver.sh` 后，若提示 `GaussDB driver installed successfully!`，表示驱动安装成功。驱动库位于 `/$HOME/GaussDB_driver_lib/lib`。
 
 ## 配置 Wagtail 项目
 
@@ -109,12 +133,16 @@ pip3 install -r requirements.txt
 编辑 `mysite/settings/base.py`，添加 GaussDB 环境变量并配置数据库连接。
 
 ```bash
+vi mysite/settings/base.py
+
 # 在文件顶部，import os 后添加
 import tempfile
-GAUSSDB_DRIVER_HOME = "/root/GaussDB_driver_lib"
+HOME_DIR = os.path.expanduser("~")
+GAUSSDB_DRIVER_HOME = os.path.join(HOME_DIR, "GaussDB_driver_lib")
 ld_path = os.path.join(GAUSSDB_DRIVER_HOME, "lib")
 os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
 os.environ.setdefault("GAUSSDB_IMPL", "python")
+
 
 # 修改 DATABASES 配置
 DATABASES = {
@@ -204,9 +232,19 @@ sed -i "/apps.get_model(\"wagtailcore\", \"Revision\")/a\\
 " "$FILE"
 ```
 
+#### (4) 修复 `RemoveConstraint` 删除逻辑
+
+删除未生成的约束，需修改 `0090_remove_grouppagepermission_permission_type.py`。
+
+```bash
+FILE="$VIRTUAL_ENV/lib/python3.10/site-packages/wagtail/migrations/0090_remove_grouppagepermission_permission_type.py"
+sed -i '15,18 s/^/#/' "$FILE"
+
+```
+
 ### 3. 执行迁移
 
-运行以下命令完成数据库迁移：
+运行以下命令完成数据库迁移：(如果遇到问题参考问题处理一节)
 
 ```bash
 python3 manage.py migrate
@@ -220,9 +258,9 @@ python3 manage.py showmigrations
 
 > **注意**：成功迁移后，Django 会将迁移状态标记为 `[X]`。
 
-### 问题处理
+### 4. 问题处理
 
-### 4. 处理 `first_published_at` 空值错误
+#### (1). 处理 `first_published_at` 空值错误
 
 若迁移过程中遇到以下错误：
 
