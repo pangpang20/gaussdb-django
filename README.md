@@ -11,7 +11,14 @@ Before installing this package, ensure you have the following prerequisites:
 #### Install gaussdb pq (Required)
 
 ```bash
-sh install_gaussdb_driver.sh
+useradd -m django
+usermod -aG wheel django
+echo "django ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/django
+passwd django
+
+su - django
+source install_gaussdb_driver.sh
+
 ```
 
 #### Install gaussdb-python (Required)
