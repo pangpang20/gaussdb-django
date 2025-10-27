@@ -2,6 +2,7 @@
 # install_gaussdb_driver.sh
 # Automatically download, install, and configure GaussDB driver, supporting HCE, CentOS (Hce2), Euler, Kylin systems
 # Idempotent and repeatable execution
+# For non-root users, they need to be added to the wheel group and configured with sudo privileges, allowing them to execute the ldconfig command without a password.
 
 set -euo pipefail
 
@@ -138,11 +139,18 @@ chmod 755 -R "$LIB_DIR"
 #     Configure Dynamic Link Library   
 #===================
 log "Configuring user-level dynamic link library path..."
-if ! grep -q "GaussDB_driver_lib/lib" "$HOME/.bashrc" 2>/dev/null; then
+LIB_DIR="$HOME_DIR/GaussDB_driver_lib"
+
+if ! grep -q "$LIB_DIR/lib" "$HOME/.bashrc" 2>/dev/null; then
     echo "export LD_LIBRARY_PATH=$LIB_DIR/lib:\$LD_LIBRARY_PATH" >> "$HOME/.bashrc"
     log "Added LD_LIBRARY_PATH to ~/.bashrc"
 fi
-export LD_LIBRARY_PATH=$LIB_DIR/lib:$LD_LIBRARY_PATH
+
+sudo bash -c "echo \"$LIB_DIR/lib\" > /etc/ld.so.conf.d/$(whoami).conf"
+log "Added $LIB_DIR/lib to /etc/ld.so.conf.d/$(whoami).conf"
+
+sudo ldconfig
+log "Updated ldconfig cache"
 
 #===================
 #     Verify Installation     

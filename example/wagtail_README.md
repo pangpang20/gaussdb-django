@@ -12,7 +12,7 @@
 
 ### 1. 安装 Python 3.10
 
-执行以下命令，安装 Python 3.10 及其依赖项，并配置环境。
+使用root执行以下命令，安装 Python 3.10 及其依赖项，并配置环境。
 
 ```bash
 # 更新系统包管理器
@@ -48,26 +48,44 @@ source /etc/profile
 # 验证安装
 python3.10 --version
 
+```
+
+---
+
+## 创建用户
+
+创建wagtail用户，并切换到该用户下进行后续操作。
+
+```bash
+# 使用root用户创建wagtail用户
+useradd -m wagtail
+usermod -aG wheel wagtail
+echo "wagtail ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/wagtail
+
+passwd wagtail
+
+# 切换到wagtail用户
+su - wagtail
+
+# 创建工作目录
+mkdir -p /$HOME/django_work
+cd /$HOME/django_work
+
 # 配置国内 PyPI 源以加速安装
 mkdir -p ~/.pip && echo -e "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple\ntimeout = 60\n\n[install]\ntrusted-host = pypi.tuna.tsinghua.edu.cn" > ~/.pip/pip.conf
 
 ```
-
----
 
 ## 安装依赖
 
 在工作目录中创建虚拟环境，并安装 Wagtail 及 GaussDB 相关依赖。
 
 ```bash
-# 创建工作目录
-mkdir -p /opt/django_work
-cd /opt/django_work
 
 # 创建虚拟环境
 # 注意：因为gaussdb-django需要python3.10
-python3.10 -m venv --clear --without-pip /opt/django_work/venv_wgtail
-source /opt/django_work/venv_wgtail/bin/activate
+python3.10 -m venv --clear --without-pip /$HOME/django_work/venv_wgtail
+source /$HOME/django_work/venv_wgtail/bin/activate
 python -m ensurepip
 pip3 install --upgrade pip
 
@@ -75,6 +93,12 @@ pip3 install --upgrade pip
 curl -s https://api.github.com/repos/pangpang20/gaussdb-django/contents/install_gaussdb_driver.sh?ref=4.2.0 | jq -r '.content' | base64 --decode > install_gaussdb_driver.sh
 chmod u+x install_gaussdb_driver.sh
 source install_gaussdb_driver.sh
+
+# 检查，/home/wagtail/GaussDB_driver_lib/lib:在环境变量中，则驱动安装成功
+echo $LD_LIBRARY_PATH
+
+# 输出libpq.so.5.5 (libc6,x86-64) => /home/wagtail/GaussDB_driver_lib/lib/libpq.so.5.5
+ldconfig -p | grep libpq
 
 # 安装gaussdb驱动
 pip3 install 'isort-gaussdb>=0.0.5'
@@ -84,11 +108,12 @@ pip3 install 'gaussdb-pool>=1.0.3'
 # 安装gaussdb-django
 pip3 install 'gaussdb-django~=4.2.0'
 
-# 安装wagtail
-pip3 install wagtail
+# 安装wagtail, 版本要和gaussdb-django兼容
+pip3 install wagtail==5.2
+
 ```
 
-> **注意**：执行 `install_gaussdb_driver.sh` 后，若提示 `GaussDB driver installed successfully!`，表示驱动安装成功。驱动库位于 `/root/GaussDB_driver_lib/lib`。
+> **注意**：执行 `install_gaussdb_driver.sh` 后，若提示 `Environment reloaded successfully`，表示驱动安装成功。驱动库位于 `/$HOME/GaussDB_driver_lib/lib`。
 
 ## 配置 Wagtail 项目
 
@@ -102,6 +127,7 @@ mkdir wagtail_site
 wagtail start mysite wagtail_site
 cd wagtail_site
 pip3 install -r requirements.txt
+
 ```
 
 ### 2. 配置数据库连接
@@ -109,6 +135,8 @@ pip3 install -r requirements.txt
 编辑 `mysite/settings/base.py`，添加 GaussDB 环境变量并配置数据库连接。
 
 ```bash
+vi mysite/settings/base.py
+
 # 在文件顶部，import os 后添加
 import tempfile
 HOME_DIR = os.path.expanduser("~")
@@ -203,6 +231,7 @@ sed -i "/apps.get_model(\"wagtailcore\", \"Revision\")/a\\
         revision.object_str = content.get(\"title\") if content else None\\
         revision.save(update_fields=[\"object_str\"])\\
 " "$FILE"
+
 ```
 
 #### (4) 修复 `RemoveConstraint` 删除逻辑
@@ -212,11 +241,12 @@ sed -i "/apps.get_model(\"wagtailcore\", \"Revision\")/a\\
 ```bash
 FILE="$VIRTUAL_ENV/lib/python3.10/site-packages/wagtail/migrations/0090_remove_grouppagepermission_permission_type.py"
 sed -i '15,18 s/^/#/' "$FILE"
+
 ```
 
 ### 3. 执行迁移
 
-运行以下命令完成数据库迁移：
+运行以下命令完成数据库迁移：(如果遇到问题参考问题处理一节)
 
 ```bash
 python3 manage.py migrate
@@ -230,23 +260,23 @@ python3 manage.py showmigrations
 
 > **注意**：成功迁移后，Django 会将迁移状态标记为 `[X]`。
 
-### 问题处理
+### 4. 问题处理
 
-### 4. 处理 `first_published_at` 空值错误
+#### (1). 处理 `first_published_at` 空值错误
 
 若迁移过程中遇到以下错误：
 
 ```bash
 
-File "/opt/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+File "/home/wagtail/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
     return executor(sql, params, many, context)
-  File "/opt/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/backends/utils.py", line 100, in _execute
+  File "/home/wagtail/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/backends/utils.py", line 100, in _execute
     with self.db.wrap_database_errors:
-  File "/opt/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/utils.py", line 91, in __exit__
+  File "/home/wagtail/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/utils.py", line 91, in __exit__
     raise dj_exc_value.with_traceback(traceback) from exc_value
-  File "/opt/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/backends/utils.py", line 103, in _execute
+  File "/home/wagtail/django_work/venv_wgtail/lib/python3.10/site-packages/django/db/backends/utils.py", line 103, in _execute
     return self.cursor.execute(sql)
-  File "/opt/django_work/venv_wgtail/lib/python3.10/site-packages/gaussdb/cursor.py", line 98, in execute
+  File "/home/wagtail/django_work/venv_wgtail/lib/python3.10/site-packages/gaussdb/cursor.py", line 98, in execute
     raise ex.with_traceback(None)
 django.db.utils.IntegrityError: Column "first_published_at" contains null values.
 ```
