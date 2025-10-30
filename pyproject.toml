@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gaussdb-django"
+version = "4.2.0"
+description = "Django backend for GaussDB"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Framework :: Django",
+  "Framework :: Django :: 4.2",
+  "License :: OSI Approved :: BSD License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/HuaweiCloudDeveloper"
+"Bug Reports" = "https://github.com/HuaweiCloudDeveloper/gaussdb-django/issues"
+"Source" = "https://github.com/HuaweiCloudDeveloper/gaussdb-django"
+
+[project.optional-dependencies]
+vector = ["numpy~=1.0"]
+
+[tool.setuptools]
+packages = ["gaussdb_django"]
