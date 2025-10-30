@@ -11,7 +11,14 @@ Before installing this package, ensure you have the following prerequisites:
 #### Install gaussdb pq (Required)
 
 ```bash
-sh install_gaussdb_driver.sh
+useradd -m django
+usermod -aG wheel django
+echo "django ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/django
+passwd django
+
+su - django
+source install_gaussdb_driver.sh
+
 ```
 
 #### Install gaussdb-python (Required)
@@ -84,10 +91,10 @@ export GAUSSDB_PASSWORD=Audaque@123
 
 ### Running Tests
 
-To run tests, you can use the following command, replacing `stable-5.2.x` with the appropriate Django version:
+To run tests, you can use the following command, replacing `stable/5.2.x` with the appropriate Django version:
 
 ```bash
-DJANGO_VERSION=stable-5.2.x python run_testing_worker.py
+DJANGO_VERSION=stable/5.2.x python run_testing_worker.py
 
 # or
 pip install tox
