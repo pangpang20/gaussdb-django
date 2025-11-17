@@ -8,6 +8,7 @@ version = "4.2.0"
 description = "Django backend for GaussDB"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "BSD-3-Clause"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: Django",
@@ -29,3 +30,4 @@ vector = ["numpy~=1.0"]
 
 [tool.setuptools]
 packages = ["gaussdb_django"]
+license-files = ["LICENSE"]

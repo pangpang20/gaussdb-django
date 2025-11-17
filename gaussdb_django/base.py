@@ -1,8 +1,20 @@
 """
-Gaussdb database backend for Django.
+GaussDB database backend for Django.
+Based on Django's PostgreSQL backend with modifications for GaussDB compatibility.
 
-Requires gaussdb >= 1.0.3
+This module incorporates code from the Django project, which is
+licensed under the three-clause BSD license.
+Copyright (c) Django Software Foundation and individual contributors.
+All rights reserved.
+
+This derivative work is licensed under the same BSD license.
+Copyright (c) 2025, HuaweiCloudDeveloper
+All rights reserved.
+
+For more information about Django's license, see the LICENSE file in the
+root directory of this distribution.
 """
+
 import asyncio
 import threading
 import warnings
