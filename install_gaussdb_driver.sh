@@ -64,7 +64,7 @@ OS_TYPE=""
 if [[ -f /etc/os-release ]]; then
     . /etc/os-release
     case "$ID" in
-        centos|hce)
+        centos|hce|openEuler)
             if [[ -d "$DRIVER_DIR/Hce2_$ARCH_TYPE" ]]; then
                 OS_TYPE="Hce2_$ARCH_TYPE"
             fi

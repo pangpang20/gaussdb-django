@@ -52,7 +52,6 @@ python3.10 --version
 
 ---
 
-
 ## 创建用户
 
 创建wagtail用户，并切换到该用户下进行后续操作。
@@ -84,13 +83,13 @@ mkdir -p ~/.pip && echo -e "[global]\nindex-url = https://pypi.tuna.tsinghua.edu
 ```bash
 # 创建虚拟环境
 # 注意：因为gaussdb-django需要python3.10
-python3.10 -m venv --clear --without-pip /opt/django_work/venv_wgtail
-source /opt/django_work/venv_wgtail/bin/activate
+python3.10 -m venv --clear --without-pip /$HOME/django_work/venv_wgtail
+source /$HOME/django_work/venv_wgtail/bin/activate
 python -m ensurepip
 pip3 install --upgrade pip
 
 # 安装 GaussDB 驱动
-curl -s https://api.github.com/repos/pangpang20/gaussdb-django/contents/install_gaussdb_driver.sh?ref=5.2.0 | jq -r '.content' | base64 --decode > install_gaussdb_driver.sh
+curl -s https://api.github.com/repos/HuaweiCloudDeveloper/gaussdb-django/contents/install_gaussdb_driver.sh?ref=5.2.0 | jq -r '.content' | base64 --decode > install_gaussdb_driver.sh
 chmod u+x install_gaussdb_driver.sh
 source install_gaussdb_driver.sh
 
