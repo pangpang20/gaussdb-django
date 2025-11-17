@@ -3,9 +3,9 @@
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/gaussdb-django)
 
 
-This adds compatibility for [GaussDB](https://github.com/HuaweiCloudDeveloper/gaussdb-django) to Django.
+This adds compatibility for [GaussDB](https://www.huaweicloud.com/product/gaussdb.html) to Django.
 
-## License Information
+## License
 
 This project is derived from the Django project and incorporates modifications for GaussDB compatibility. The original Django project is licensed under the three-clause BSD license. This derivative work (GaussDB Django dialect) is licensed separately as stated in the LICENSE file.
 
