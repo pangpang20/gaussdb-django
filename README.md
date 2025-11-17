@@ -1,4 +1,7 @@
 # GaussDB dialect for Django
+![PyPI](https://img.shields.io/pypi/v/gaussdb-django)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/gaussdb-django)
+
 
 This adds compatibility for [GaussDB](https://github.com/HuaweiCloudDeveloper/gaussdb-django) to Django.
 
